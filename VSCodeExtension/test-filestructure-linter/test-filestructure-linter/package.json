@@ -1,0 +1,79 @@
+{
+  "name": "test-filestructure-linter",
+  "displayName": "Test Structure Linter",
+  "description": "Analyzes and validates test file structure in .NET projects",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Linters",
+    "Testing"
+  ],
+  "activationEvents": [
+    "onCommand:test-filestructure-linter.analyze",
+    "onView:testStructureLinter"
+  ],
+  "main": "./out/extension.js",
+  "bin": {
+    "test-structure-lint": "./out/cli.js"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "test-filestructure-linter.analyze",
+        "title": "Analyze Test Structure",
+        "category": "Test Structure",
+        "icon": "$(search)",
+        "enablement": "workspaceFolderCount != 0"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "test-structure-linter",
+          "title": "Test Structure Linter",
+          "icon": "$(beaker)"
+        }
+      ]
+    },
+    "views": {
+      "test-structure-linter": [
+        {
+          "id": "testStructureLinter",
+          "name": "Test Analysis",
+          "type": "webview"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "test-filestructure-linter.analyze",
+          "when": "view == testStructureLinter",
+          "group": "navigation@1"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "analyze": "node ./out/cli.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.96.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^8.17.0",
+    "@typescript-eslint/parser": "^8.17.0",
+    "eslint": "^9.16.0",
+    "typescript": "^5.7.2",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1"
+  }
+}
