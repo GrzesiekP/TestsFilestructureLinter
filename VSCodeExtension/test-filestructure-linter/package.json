@@ -15,10 +15,7 @@
     "Linters",
     "Testing"
   ],
-  "activationEvents": [
-    "onCommand:test-filestructure-linter.analyze",
-    "onView:testStructureLinter"
-  ],
+  "activationEvents": [],
   "main": "./out/extension.js",
   "bin": {
     "test-structure-lint": "./out/cli.js"
