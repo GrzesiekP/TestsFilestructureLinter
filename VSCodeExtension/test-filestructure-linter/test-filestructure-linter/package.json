@@ -3,6 +3,11 @@
   "displayName": "Test Structure Linter",
   "description": "Analyzes and validates test file structure in .NET projects",
   "version": "0.0.1",
+  "publisher": "Grzegorz Pawłowski",
+  "author": {
+    "name": "Grzegorz Pawłowski",
+    "email": "kontakt@grzegorzpawlowski.pl"
+  },
   "engines": {
     "vscode": "^1.96.0"
   },
