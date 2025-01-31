@@ -612,7 +612,10 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 						<div class="summary-text">Last analyzed at: ${lastAnalyzedTime}</div>
 						${hasIssues ? `<div class="summary-text">Issues found in ${results.length} files${hasFixableIssues() ? ` (${countFixableFiles(results)} fixable)` : ''}</div>` : ''}
 					</div>
-					${hasFixableIssues() ? `<button class="fix-all-button">Fix All</button>` : ''}
+					${hasFixableIssues() ? 
+						`<button class="fix-all-button" title="Fix all issues by creating missing test files and moving misplaced test files to their correct locations">
+							Fix All
+						</button>` : ''}
 				</div>
 			</div>
 			<div class="tree">`;
@@ -635,7 +638,20 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 							${fileName}
 						</div>
 						${(isFixable || isMissingTest) && experimentalFixesEnabled ? 
-							`<button class="fix-button" data-error-type="${isMissingTest ? AnalysisErrorType.MissingTest : AnalysisErrorType.InvalidDirectoryStructure}" data-file-path="${result.testFilePath}">Fix</button>` : 
+							`<button class="fix-button" 
+								data-error-type="${isMissingTest ? AnalysisErrorType.MissingTest : AnalysisErrorType.InvalidDirectoryStructure}" 
+								data-file-path="${result.testFilePath}"
+								title="${isMissingTest ? 
+									// For missing test, check if there's a misplaced test file
+									results.some(r => 
+										r.errors.some(e => 
+											e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+											path.basename(r.testFilePath, '.cs').replace('Tests', '') === path.basename(result.testFilePath, '.cs')
+										)
+									) ? 'Move existing test file to the correct location' : 'Create a new test file in the correct location'
+									: 'Move test file to the correct location'}">
+								Fix
+							</button>` : 
 							''}
 					</div>
 					<div class="file-content">
