@@ -6,12 +6,12 @@ using Moq;
 namespace Application.Tests.Services;
 
 [TestClass]
-public class OrderServiceTest
+public class OrderServiceTests
 {
     private readonly Mock<IOrderRepository> _orderRepositoryMock;
     private readonly OrderService _orderService;
 
-    public OrderServiceTest()
+    public OrderServiceTests()
     {
         _orderRepositoryMock = new Mock<IOrderRepository>();
         _orderService = new OrderService(_orderRepositoryMock.Object);

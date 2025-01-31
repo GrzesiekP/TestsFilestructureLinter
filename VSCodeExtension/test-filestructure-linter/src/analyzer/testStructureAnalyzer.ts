@@ -40,6 +40,11 @@ export class TestStructureAnalyzer {
         return config.get<boolean>('enableExperimentalFixes') ?? false;
     }
 
+    private isMissingTestValidationEnabled(): boolean {
+        const config = vscode.workspace.getConfiguration('testFilestructureLinter');
+        return config.get<boolean>('enableMissingTestValidation') ?? false;
+    }
+
     private isIgnoredDirectory(dirName: string): boolean {
         return this.getIgnoredDirectories().includes(dirName);
     }
@@ -69,6 +74,64 @@ export class TestStructureAnalyzer {
         return fileNameWithoutExtension.slice(0, -suffix.length);
     }
 
+    private async findSourceFiles(workspacePath: string): Promise<string[]> {
+        const sourceFiles: string[] = [];
+        const sourceRoot = path.join(workspacePath, this.getSourceRoot());
+        
+        try {
+            await fs.promises.access(sourceRoot);
+            await this.findSourceFilesRecursive(sourceRoot, sourceFiles);
+        } catch (error) {
+            console.warn(`Source root directory not found: ${sourceRoot}`);
+        }
+
+        return sourceFiles;
+    }
+
+    private async findSourceFilesRecursive(dirPath: string, sourceFiles: string[]): Promise<void> {
+        const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+
+        for (const entry of entries) {
+            if (this.isIgnoredDirectory(entry.name)) {
+                continue;
+            }
+
+            const fullPath = path.join(dirPath, entry.name);
+            if (entry.isDirectory()) {
+                await this.findSourceFilesRecursive(fullPath, sourceFiles);
+            } else if (entry.isFile() && 
+                      entry.name.endsWith(this.options.fileExtension) &&
+                      !this.isTestFile(entry.name)) {
+                sourceFiles.push(fullPath);
+            }
+        }
+    }
+
+    private getExpectedTestPath(sourceFilePath: string, workspacePath: string, testProjectPath: string): string {
+        const sourceRoot = path.join(workspacePath, this.getSourceRoot());
+        const relativeSourcePath = path.relative(sourceRoot, path.dirname(sourceFilePath));
+        const sourceFileName = path.basename(sourceFilePath, this.options.fileExtension);
+        const testFileName = sourceFileName + this.getTestFileSuffixes()[0] + this.options.fileExtension;
+        
+        // Get source project name from the relative path
+        const pathParts = relativeSourcePath.split(path.sep);
+        const sourceProjectName = pathParts[0]; // e.g., "Application"
+        
+        // Construct test project name
+        const testProjectName = sourceProjectName + this.getTestProjectSuffix(); // e.g., "Application.Tests"
+        
+        // Remove the project name from the relative path
+        const remainingPath = pathParts.slice(1).join(path.sep);
+        
+        return path.join(
+            workspacePath,
+            this.getTestRoot(),
+            testProjectName,
+            remainingPath,
+            testFileName
+        );
+    }
+
     public async analyzeWorkspace(workspacePath: string): Promise<AnalysisResult[]> {
         const results: AnalysisResult[] = [];
         const testRoot = path.join(workspacePath, this.getTestRoot());
@@ -77,6 +140,7 @@ export class TestStructureAnalyzer {
             await fs.promises.access(testRoot);
             const testProjects = await this.findTestProjects(testRoot);
 
+            // First, analyze test files
             for (const testProject of testProjects) {
                 const testFiles = await this.findTestFiles(testProject);
                 for (const testFile of testFiles) {
@@ -86,6 +150,14 @@ export class TestStructureAnalyzer {
                     }
                 }
             }
+
+            // Then, if enabled, check for missing tests
+            if (this.isMissingTestValidationEnabled()) {
+                const sourceFiles = await this.findSourceFiles(workspacePath);
+                const missingTestResults = await this.analyzeMissingTests(sourceFiles, testProjects, workspacePath, results);
+                results.push(...missingTestResults);
+            }
+
         } catch (error) {
             console.warn(`Test root directory not found: ${testRoot}`);
         }
@@ -268,5 +340,73 @@ export class TestStructureAnalyzer {
                 };
             }
         }
+    }
+
+    private async analyzeMissingTests(
+        sourceFiles: string[], 
+        testProjects: string[], 
+        workspacePath: string,
+        existingResults: AnalysisResult[]
+    ): Promise<AnalysisResult[]> {
+        const results: AnalysisResult[] = [];
+
+        for (const sourceFile of sourceFiles) {
+            const sourceFileName = path.basename(sourceFile);
+            const className = sourceFileName.replace(this.options.fileExtension, '');
+            
+            // Check each test project
+            let testFileFound = false;
+            let wrongLocationTestFile = existingResults.find(r => 
+                r.errors.some(e => 
+                    e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+                    path.basename(r.testFilePath, this.options.fileExtension).replace('Tests', '') === className
+                )
+            );
+
+            if (wrongLocationTestFile) {
+                results.push({
+                    testFile: sourceFileName,
+                    testFilePath: sourceFile,
+                    errors: [{
+                        type: AnalysisErrorType.MissingTest,
+                        message: `Test file exists but is in wrong location: ${wrongLocationTestFile.testFilePath}`,
+                        suggestion: 'Find the test file in the issues list above and use the Fix button to move it to the correct location'
+                    }]
+                });
+                continue;
+            }
+
+            // Get the expected test path
+            const expectedTestPath = this.getExpectedTestPath(sourceFile, workspacePath, testProjects[0]);
+            try {
+                await fs.promises.access(expectedTestPath);
+                testFileFound = true;
+            } catch {
+                // Test file not found in expected location, try to find it with a more flexible search
+                const testFileName = className + this.getTestFileSuffixes()[0] + this.options.fileExtension;
+                const files = await vscode.workspace.findFiles(
+                    `${this.getTestRoot()}/**/${testFileName}`,
+                    `**/{${this.getIgnoredDirectories().join(',')}}/**`
+                );
+                
+                if (files.length > 0) {
+                    testFileFound = true;
+                }
+            }
+
+            if (!testFileFound) {
+                results.push({
+                    testFile: sourceFileName,
+                    testFilePath: sourceFile,
+                    errors: [{
+                        type: AnalysisErrorType.MissingTest,
+                        message: `No test file found for: ${sourceFileName}`,
+                        suggestion: `Create test file at: ${expectedTestPath}`
+                    }]
+                });
+            }
+        }
+
+        return results;
     }
 } 

@@ -12,17 +12,20 @@ export interface AnalysisError {
 
 export enum AnalysisErrorType {
     InvalidFileName = 'InvalidFileName',
-    InvalidDirectoryStructure = 'InvalidDirectoryStructure'
+    InvalidDirectoryStructure = 'InvalidDirectoryStructure',
+    MissingTest = 'MissingTest'
 }
 
 export interface AnalyzerOptions {
     srcRoot: string;
     testRoot: string;
     fileExtension: string;
+    enableMissingTestValidation: boolean;
 }
 
 export const DEFAULT_OPTIONS: AnalyzerOptions = {
     srcRoot: 'src',
     testRoot: 'tests',
-    fileExtension: '.cs'
+    fileExtension: '.cs',
+    enableMissingTestValidation: false
 }; 

@@ -49,7 +49,12 @@
         "testFilestructureLinter.enableExperimentalFixes": {
           "type": "boolean",
           "default": false,
-          "description": "Enable experimental features for fixing test structure issues automatically"
+          "description": "Enable experimental fixes for test file structure issues"
+        },
+        "testFilestructureLinter.enableMissingTestValidation": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable validation to check if source files have corresponding test files"
         },
         "testFilestructureLinter.testFileSuffixes": {
           "type": "array",
