@@ -575,10 +575,35 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					height: 22px;
 					line-height: 14px;
 					font-family: var(--vscode-font-family);
+					position: relative;
+					min-width: 40px;
 				}
-				.fix-button:hover {
+				.fix-button:disabled {
+					opacity: 0.5;
+					cursor: not-allowed;
+				}
+				.fix-button:hover:not(:disabled) {
 					background-color: var(--vscode-button-secondaryHoverBackground);
 					color: var(--vscode-button-secondaryForeground);
+				}
+				.fix-button.fixing {
+					padding-right: 24px;
+				}
+				.fix-button .fix-spinner {
+					display: none;
+					width: 12px;
+					height: 12px;
+					border: 2px solid var(--vscode-button-secondaryForeground);
+					border-radius: 50%;
+					border-top-color: transparent;
+					animation: spin 1s linear infinite;
+					position: absolute;
+					right: 6px;
+					top: 50%;
+					transform: translateY(-50%);
+				}
+				.fix-button.fixing .fix-spinner {
+					display: block;
 				}
 				.arrow {
 					display: inline-flex;
@@ -662,7 +687,8 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 								data-error-type="${isMissingTest ? AnalysisErrorType.MissingTest : AnalysisErrorType.InvalidDirectoryStructure}" 
 								data-file-path="${result.testFilePath}"
 								title="${tooltip}">
-								Fix
+								<span class="button-text">Fix</span>
+								<div class="fix-spinner"></div>
 							</button>` : 
 							''}
 					</div>
@@ -719,9 +745,14 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 						command: 'openFile',
 						filePath: e.target.dataset.path
 					});
-				} else if (e.target.classList.contains('fix-button')) {
+				} else if (e.target.closest('.fix-button')) {
 					e.preventDefault();
-					const button = e.target;
+					const button = e.target.closest('.fix-button');
+					if (button.disabled) return;
+					
+					button.disabled = true;
+					button.classList.add('fixing');
+					
 					vscode.postMessage({
 						command: 'fix',
 						errorType: button.dataset.errorType,
