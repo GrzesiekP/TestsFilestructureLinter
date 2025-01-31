@@ -26,8 +26,22 @@ export function activate(context: vscode.ExtensionContext) {
 					enableScripts: true
 				};
 				
-				updateInitialView();
 				currentWebview = webviewView;
+				const hasWorkspace = !!(vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0);
+				webviewView.webview.html = getInitialHtml(hasWorkspace);
+
+				// Handle webview messages
+				webviewView.webview.onDidReceiveMessage(
+					async message => {
+						switch (message.command) {
+							case 'analyze':
+								await vscode.commands.executeCommand('test-filestructure-linter.analyze');
+								return;
+						}
+					},
+					undefined,
+					context.subscriptions
+				);
 
 				// Update view when workspace folders change
 				context.subscriptions.push(
@@ -78,8 +92,8 @@ function updateInitialView() {
 
 function getInitialHtml(hasWorkspace: boolean): string {
 	const message = hasWorkspace
-		? 'Click the analyze button (🔍) in the title bar above to start test structure analysis.'
-		: 'Please open a folder or workspace to analyze test structure. The analyze button will be enabled once a folder is opened.';
+		? 'Click the analyze button below to start test structure analysis.'
+		: 'Please open a folder or workspace to analyze test structure.';
 
 	return `<!DOCTYPE html>
 		<html>
@@ -108,6 +122,48 @@ function getInitialHtml(hasWorkspace: boolean): string {
 					color: var(--vscode-descriptionForeground);
 					max-width: 300px;
 					line-height: 1.4;
+					margin-bottom: 20px;
+				}
+				.analyze-button {
+					background-color: var(--vscode-button-background);
+					color: var(--vscode-button-foreground);
+					border: none;
+					padding: 8px 16px;
+					border-radius: 4px;
+					cursor: pointer;
+					font-family: var(--vscode-font-family);
+					font-size: 13px;
+					min-width: 100px;
+					position: relative;
+				}
+				.analyze-button:disabled {
+					opacity: 0.5;
+					cursor: not-allowed;
+				}
+				.analyze-button:hover:not(:disabled) {
+					background-color: var(--vscode-button-hoverBackground);
+				}
+				.loading-spinner {
+					display: none;
+					width: 16px;
+					height: 16px;
+					border: 2px solid var(--vscode-button-foreground);
+					border-radius: 50%;
+					border-top-color: transparent;
+					animation: spin 1s linear infinite;
+					position: absolute;
+					right: 8px;
+					top: 50%;
+					transform: translateY(-50%);
+				}
+				@keyframes spin {
+					to { transform: translateY(-50%) rotate(360deg); }
+				}
+				.analyzing .loading-spinner {
+					display: block;
+				}
+				.analyzing .button-text {
+					margin-right: 24px;
 				}
 			</style>
 		</head>
@@ -117,7 +173,24 @@ function getInitialHtml(hasWorkspace: boolean): string {
 				<div class="message">
 					${message}
 				</div>
+				<button class="analyze-button" ${!hasWorkspace ? 'disabled' : ''} onclick="analyze(this)">
+					<span class="button-text">Analyze</span>
+					<div class="loading-spinner"></div>
+				</button>
 			</div>
+			<script>
+				const vscode = acquireVsCodeApi();
+				
+				function analyze(button) {
+					button.disabled = true;
+					button.classList.add('analyzing');
+					button.querySelector('.button-text').textContent = 'Analyzing...';
+					
+					vscode.postMessage({
+						command: 'analyze'
+					});
+				}
+			</script>
 		</body>
 		</html>`;
 }
@@ -321,9 +394,52 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					font-family: var(--vscode-font-family);
 					background-color: var(--vscode-editor-background);
 				}
+				.restart-button {
+					background-color: var(--vscode-button-secondaryBackground);
+					color: var(--vscode-button-secondaryForeground);
+					border: none;
+					padding: 6px 12px;
+					border-radius: 4px;
+					cursor: pointer;
+					font-family: var(--vscode-font-family);
+					font-size: 13px;
+					margin: 12px;
+					display: block;
+					min-width: 120px;
+					position: relative;
+				}
+				.restart-button:disabled {
+					opacity: 0.5;
+					cursor: not-allowed;
+				}
+				.restart-button:hover:not(:disabled) {
+					background-color: var(--vscode-button-secondaryHoverBackground);
+				}
+				.loading-spinner {
+					display: none;
+					width: 14px;
+					height: 14px;
+					border: 2px solid var(--vscode-button-secondaryForeground);
+					border-radius: 50%;
+					border-top-color: transparent;
+					animation: spin 1s linear infinite;
+					position: absolute;
+					right: 8px;
+					top: 50%;
+					transform: translateY(-50%);
+				}
+				@keyframes spin {
+					to { transform: translateY(-50%) rotate(360deg); }
+				}
+				.analyzing .loading-spinner {
+					display: block;
+				}
+				.analyzing .button-text {
+					margin-right: 24px;
+				}
 				.summary {
 					padding: 12px;
-					margin: 8px 12px 16px;
+					margin: 0 12px 16px;
 					border-radius: 4px;
 					border: 1px solid;
 					border-color: ${hasIssues ? 'var(--vscode-editorWarning-foreground)' : 'var(--vscode-testing-iconPassed)'};
@@ -485,6 +601,10 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 			</style>
 		</head>
 		<body>
+			<button class="restart-button" onclick="analyze(this)">
+				<span class="button-text">Restart Analysis</span>
+				<div class="loading-spinner"></div>
+			</button>
 			<div class="summary">
 				<div class="summary-header">
 					<div class="summary-stats">
@@ -553,6 +673,16 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 				header.classList.toggle('expanded', !isExpanded);
 			}
 
+			function analyze(button) {
+				button.disabled = true;
+				button.classList.add('analyzing');
+				button.querySelector('.button-text').textContent = 'Analyzing...';
+				
+				vscode.postMessage({
+					command: 'analyze'
+				});
+			}
+
 			document.addEventListener('click', (e) => {
 				if (e.target.classList.contains('file-path')) {
 					e.preventDefault();
@@ -593,6 +723,9 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					return;
 				case 'fixAll':
 					await handleFixAllAction(message.filePaths, context);
+					return;
+				case 'analyze':
+					await vscode.commands.executeCommand('test-filestructure-linter.analyze');
 					return;
 			}
 		},
