@@ -46,6 +46,14 @@
           "default": ["bin", "obj"],
           "description": "Directories to ignore during analysis"
         },
+        "testFilestructureLinter.excludedTestFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of test file names to exclude from analysis (e.g. ['AutoMapperTests']). Case insensitive."
+        },
         "testFilestructureLinter.enableExperimentalFixes": {
           "type": "boolean",
           "default": false,
