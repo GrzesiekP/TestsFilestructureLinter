@@ -39,6 +39,8 @@ The extension supports the following settings:
 * `testFilestructureLinter.ignoredDirectories`: Array of directory names to ignore during analysis (default: ["bin", "obj"])
 * `testFilestructureLinter.testFileSuffixes`: Array of valid test file suffixes (default: ["Tests"]). Case insensitive.
 * `testFilestructureLinter.testProjectSuffix`: Suffix used to identify test projects (default: ".Tests"). Case sensitive.
+* `testFilestructureLinter.sourceRoot`: Path from repository root to source code folder (default: "src"). Case sensitive.
+* `testFilestructureLinter.testRoot`: Path from repository root to test folder (default: "tests"). Case sensitive.
 
 Other default settings:
 - Source files must have ".cs" extension
@@ -59,7 +61,9 @@ Example configuration in settings.json:
         "Test",
         "Fixture"
     ],
-    "testFilestructureLinter.testProjectSuffix": ".UnitTests"
+    "testFilestructureLinter.testProjectSuffix": ".UnitTests",
+    "testFilestructureLinter.sourceRoot": "app/src",
+    "testFilestructureLinter.testRoot": "test/unit"
 }
 ```
 

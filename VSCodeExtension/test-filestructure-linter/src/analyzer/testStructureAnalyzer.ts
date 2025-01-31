@@ -25,6 +25,16 @@ export class TestStructureAnalyzer {
         return config.get<string>('testProjectSuffix') ?? '';
     }
 
+    private getSourceRoot(): string {
+        const config = vscode.workspace.getConfiguration('testFilestructureLinter');
+        return config.get<string>('sourceRoot') ?? '';
+    }
+
+    private getTestRoot(): string {
+        const config = vscode.workspace.getConfiguration('testFilestructureLinter');
+        return config.get<string>('testRoot') ?? '';
+    }
+
     private isIgnoredDirectory(dirName: string): boolean {
         return this.getIgnoredDirectories().includes(dirName);
     }
@@ -56,16 +66,23 @@ export class TestStructureAnalyzer {
 
     public async analyzeWorkspace(workspacePath: string): Promise<AnalysisResult[]> {
         const results: AnalysisResult[] = [];
-        const testProjects = await this.findTestProjects(workspacePath);
+        const testRoot = path.join(workspacePath, this.getTestRoot());
+        
+        try {
+            await fs.promises.access(testRoot);
+            const testProjects = await this.findTestProjects(testRoot);
 
-        for (const testProject of testProjects) {
-            const testFiles = await this.findTestFiles(testProject);
-            for (const testFile of testFiles) {
-                const result = await this.analyzeTestFile(testFile, testProject, workspacePath);
-                if (result.errors.length > 0) {
-                    results.push(result);
+            for (const testProject of testProjects) {
+                const testFiles = await this.findTestFiles(testProject);
+                for (const testFile of testFiles) {
+                    const result = await this.analyzeTestFile(testFile, testProject, workspacePath);
+                    if (result.errors.length > 0) {
+                        results.push(result);
+                    }
                 }
             }
+        } catch (error) {
+            console.warn(`Test root directory not found: ${testRoot}`);
         }
 
         return results;
@@ -213,7 +230,7 @@ export class TestStructureAnalyzer {
         const relativeDir = path.dirname(relativeTestPath);
         const expectedSourcePath = path.join(
             workspacePath,
-            'src',
+            this.getSourceRoot(),
             sourceProjectName,
             relativeDir,
             testedClassName + this.options.fileExtension
@@ -226,7 +243,7 @@ export class TestStructureAnalyzer {
             // Check if the file exists in the correct location (without subdirectories)
             const expectedSimplePath = path.join(
                 workspacePath,
-                'src',
+                this.getSourceRoot(),
                 sourceProjectName,
                 testedClassName + this.options.fileExtension
             );

@@ -58,6 +58,16 @@
           "type": "string",
           "default": ".Tests",
           "description": "Suffix used to identify test projects (e.g. '.Tests', '.UnitTests'). Case sensitive."
+        },
+        "testFilestructureLinter.sourceRoot": {
+          "type": "string",
+          "default": "src",
+          "description": "Path from repository root to source code folder (e.g. 'src', 'app/src'). Case sensitive."
+        },
+        "testFilestructureLinter.testRoot": {
+          "type": "string",
+          "default": "tests",
+          "description": "Path from repository root to test folder (e.g. 'tests', 'test/unit'). Case sensitive."
         }
       }
     },
