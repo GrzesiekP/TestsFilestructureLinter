@@ -2,7 +2,7 @@
   "name": "test-filestructure-linter",
   "displayName": "Test Filestructure Linter",
   "description": "Analyzes and validates test file structure in .NET projects",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "icon": "resources/icon.png",
   "publisher": "GrzegorzPawlowski",
   "author": {
@@ -41,8 +41,7 @@
         {
           "id": "test-filestructure-linter",
           "title": "Test Filestructure Linter",
-          "icon": "$(beaker)"
-
+          "icon": "resources/icon-activity.svg"
         }
       ]
     },
