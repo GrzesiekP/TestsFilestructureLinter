@@ -1,3 +1,4 @@
 node_modules/
 requirement for development.md
 out/
+.vscode-test/
