@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import { AnalysisError, AnalysisErrorType, AnalysisResult, AnalyzerOptions, DEFAULT_OPTIONS } from './types';
 
 export class TestStructureAnalyzer {
@@ -7,6 +8,15 @@ export class TestStructureAnalyzer {
 
     constructor(options: Partial<AnalyzerOptions> = {}) {
         this.options = { ...DEFAULT_OPTIONS, ...options };
+    }
+
+    private getIgnoredDirectories(): string[] {
+        const config = vscode.workspace.getConfiguration('testFilestructureLinter');
+        return config.get<string[]>('ignoredDirectories') ?? [];
+    }
+
+    private isIgnoredDirectory(dirName: string): boolean {
+        return this.getIgnoredDirectories().includes(dirName);
     }
 
     public async analyzeWorkspace(workspacePath: string): Promise<AnalysisResult[]> {
@@ -31,7 +41,7 @@ export class TestStructureAnalyzer {
         const entries = await fs.promises.readdir(workspacePath, { withFileTypes: true });
 
         for (const entry of entries) {
-            if (entry.isDirectory()) {
+            if (entry.isDirectory() && !this.isIgnoredDirectory(entry.name)) {
                 const fullPath = path.join(workspacePath, entry.name);
                 if (entry.name.endsWith('.Tests')) {
                     projects.push(fullPath);
@@ -51,6 +61,10 @@ export class TestStructureAnalyzer {
         const entries = await fs.promises.readdir(projectPath, { withFileTypes: true });
 
         for (const entry of entries) {
+            if (this.isIgnoredDirectory(entry.name)) {
+                continue;
+            }
+
             const fullPath = path.join(projectPath, entry.name);
             if (entry.isDirectory()) {
                 const subFiles = await this.findTestFiles(fullPath);

@@ -33,9 +33,21 @@
         "category": "Test Filestructure",
         "icon": "$(search)",
         "enablement": "workspaceFolderCount != 0"
-
       }
     ],
+    "configuration": {
+      "title": "Test Filestructure Linter",
+      "properties": {
+        "testFilestructureLinter.ignoredDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["bin", "obj"],
+          "description": "List of directories that should be ignored during test file analysis."
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -52,7 +64,6 @@
           "name": "Test Analysis",
           "type": "webview"
         }
-
       ]
     },
     "menus": {
@@ -61,7 +72,6 @@
           "command": "test-filestructure-linter.analyze",
           "when": "view == testFilestructureLinter",
           "group": "navigation@1"
-
         }
       ]
     }

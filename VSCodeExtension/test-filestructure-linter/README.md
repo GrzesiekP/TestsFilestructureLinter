@@ -34,10 +34,28 @@ The extension validates the following aspects of your test files:
 
 ## Extension Settings
 
-Currently, the extension uses these default settings:
+The extension supports the following settings:
+
+* `testFilestructureLinter.ignoredDirectories`: Array of directory names to ignore during analysis (default: ["bin", "obj"])
+
+Other default settings:
 - Test projects must end with ".Tests"
 - Test files must end with "Tests.cs"
 - Source files must have ".cs" extension
+
+You can modify these settings in VS Code's settings.json file or through the Settings UI (File > Preferences > Settings).
+
+Example configuration in settings.json:
+```json
+{
+    "testFilestructureLinter.ignoredDirectories": [
+        "bin",
+        "obj",
+        "node_modules",
+        "packages"
+    ]
+}
+```
 
 ## Known Issues
 
