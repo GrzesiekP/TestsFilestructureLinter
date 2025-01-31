@@ -15,8 +15,33 @@ export class TestStructureAnalyzer {
         return config.get<string[]>('ignoredDirectories') ?? [];
     }
 
+    private getTestFileSuffixes(): string[] {
+        const config = vscode.workspace.getConfiguration('testFilestructureLinter');
+        return config.get<string[]>('testFileSuffixes') ?? [];
+    }
+
     private isIgnoredDirectory(dirName: string): boolean {
         return this.getIgnoredDirectories().includes(dirName);
+    }
+
+    private isTestFile(fileName: string): boolean {
+        const fileNameWithoutExtension = path.basename(fileName, this.options.fileExtension);
+        return this.getTestFileSuffixes().some(suffix => 
+            fileNameWithoutExtension.toLowerCase().endsWith(suffix.toLowerCase())
+        );
+    }
+
+    private getTestedClassName(testFileName: string): string {
+        const fileNameWithoutExtension = path.basename(testFileName, this.options.fileExtension);
+        const suffix = this.getTestFileSuffixes().find(suffix => 
+            fileNameWithoutExtension.toLowerCase().endsWith(suffix.toLowerCase())
+        );
+        
+        if (!suffix) {
+            return fileNameWithoutExtension;
+        }
+
+        return fileNameWithoutExtension.slice(0, -suffix.length);
     }
 
     public async analyzeWorkspace(workspacePath: string): Promise<AnalysisResult[]> {
@@ -69,7 +94,9 @@ export class TestStructureAnalyzer {
             if (entry.isDirectory()) {
                 const subFiles = await this.findTestFiles(fullPath);
                 testFiles.push(...subFiles);
-            } else if (entry.isFile() && entry.name.endsWith(this.options.fileExtension)) {
+            } else if (entry.isFile() && 
+                      entry.name.endsWith(this.options.fileExtension) && 
+                      this.isTestFile(entry.name)) {
                 testFiles.push(fullPath);
             }
         }
@@ -93,7 +120,7 @@ export class TestStructureAnalyzer {
 
         // Get the class being tested
         const testFileName = path.basename(testFilePath);
-        const testedClassName = testFileName.replace('Tests' + this.options.fileExtension, '');
+        const testedClassName = this.getTestedClassName(testFileName);
 
         // Validate class reference
         const referenceError = await this.validateClassReference(testFilePath, testedClassName);
@@ -114,12 +141,13 @@ export class TestStructureAnalyzer {
         const fileName = path.basename(testFilePath);
         const fileContent = await fs.promises.readFile(testFilePath, 'utf8');
         
-        // Check if file ends with Tests.cs
-        if (!fileName.endsWith('Tests' + this.options.fileExtension)) {
+        // Check if file ends with any of the configured test suffixes
+        if (!this.isTestFile(fileName)) {
+            const defaultSuffix = this.getTestFileSuffixes()[0];
             return {
                 type: AnalysisErrorType.InvalidFileName,
-                message: `File name must end with 'Tests${this.options.fileExtension}'`,
-                suggestion: fileName.replace(this.options.fileExtension, '') + 'Tests' + this.options.fileExtension
+                message: `File name must end with one of the configured test suffixes (${this.getTestFileSuffixes().join(', ')})`,
+                suggestion: fileName.replace(this.options.fileExtension, '') + defaultSuffix + this.options.fileExtension
             };
         }
 

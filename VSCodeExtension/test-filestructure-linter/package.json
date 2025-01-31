@@ -45,6 +45,14 @@
           },
           "default": ["bin", "obj"],
           "description": "List of directories that should be ignored during test file analysis."
+        },
+        "testFilestructureLinter.testFileSuffixes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["Tests"],
+          "description": "List of valid test file suffixes (e.g. ['Tests', 'Test']). Case insensitive."
         }
       }
     },
