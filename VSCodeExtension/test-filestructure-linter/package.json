@@ -1,12 +1,17 @@
 {
   "name": "test-filestructure-linter",
-  "displayName": "Test Structure Linter",
+  "displayName": "Test Filestructure Linter",
   "description": "Analyzes and validates test file structure in .NET projects",
-  "version": "0.0.1",
-  "publisher": "Grzegorz Pawłowski",
+  "version": "0.0.3",
+  "icon": "resources/icon.png",
+  "publisher": "GrzegorzPawlowski",
   "author": {
     "name": "Grzegorz Pawłowski",
     "email": "kontakt@grzegorzpawlowski.pl"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GrzesiekP/TestsFilestructureLinter"
   },
   "engines": {
     "vscode": "^1.96.0"
@@ -24,36 +29,40 @@
     "commands": [
       {
         "command": "test-filestructure-linter.analyze",
-        "title": "Analyze Test Structure",
-        "category": "Test Structure",
+        "title": "Analyze Test Filestructure",
+        "category": "Test Filestructure",
         "icon": "$(search)",
         "enablement": "workspaceFolderCount != 0"
+
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "test-structure-linter",
-          "title": "Test Structure Linter",
+          "id": "test-filestructure-linter",
+          "title": "Test Filestructure Linter",
           "icon": "$(beaker)"
+
         }
       ]
     },
     "views": {
-      "test-structure-linter": [
+      "test-filestructure-linter": [
         {
-          "id": "testStructureLinter",
+          "id": "testFilestructureLinter",
           "name": "Test Analysis",
           "type": "webview"
         }
+
       ]
     },
     "menus": {
       "view/title": [
         {
           "command": "test-filestructure-linter.analyze",
-          "when": "view == testStructureLinter",
+          "when": "view == testFilestructureLinter",
           "group": "navigation@1"
+
         }
       ]
     }

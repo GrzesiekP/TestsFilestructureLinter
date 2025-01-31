@@ -11,17 +11,19 @@ let currentWebview: vscode.WebviewView | undefined;
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-	outputChannel = vscode.window.createOutputChannel('Test Structure Analyzer');
-	diagnosticCollection = vscode.languages.createDiagnosticCollection('testStructure');
+	outputChannel = vscode.window.createOutputChannel('Test Filestructure Analyzer');
+	diagnosticCollection = vscode.languages.createDiagnosticCollection('testFilestructure');
+
 
 	const analyzer = new TestStructureAnalyzer();
 
 	// Register webview provider
 	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider('testStructureLinter', {
+		vscode.window.registerWebviewViewProvider('testFilestructureLinter', {
 			resolveWebviewView(webviewView) {
 				webviewView.webview.options = {
 					enableScripts: true
+
 				};
 				
 				updateInitialView();
