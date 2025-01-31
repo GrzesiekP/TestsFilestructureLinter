@@ -217,6 +217,17 @@ export class TestStructureAnalyzer {
         return null;
     }
 
+    private async findSourceFileInWorkspace(workspacePath: string, testedClassName: string): Promise<string | null> {
+        const searchPattern = `**/${testedClassName}${this.options.fileExtension}`;
+        const ignoredDirs = this.getIgnoredDirectories();
+        const files = await vscode.workspace.findFiles(
+            searchPattern,
+            `**/{${ignoredDirs.join(',')}}/**`
+        );
+        
+        return files.length > 0 ? files[0].fsPath : null;
+    }
+
     private async validateDirectoryStructure(
         testFilePath: string,
         testProjectPath: string,
@@ -259,6 +270,16 @@ export class TestStructureAnalyzer {
                 }
                 return null;
             } catch {
+                // If source file is not found in expected locations, search in the entire workspace
+                const foundSourcePath = await this.findSourceFileInWorkspace(workspacePath, testedClassName);
+                if (foundSourcePath) {
+                    return {
+                        type: AnalysisErrorType.InvalidDirectoryStructure,
+                        message: `Test file in invalid directory. Source file found in: ${foundSourcePath}`,
+                        suggestion: `Move test file to match source file structure: ${path.dirname(expectedSourcePath)}`
+                    };
+                }
+
                 return {
                     type: AnalysisErrorType.InvalidDirectoryStructure,
                     message: `Source file not found: ${testedClassName}${this.options.fileExtension}`,
