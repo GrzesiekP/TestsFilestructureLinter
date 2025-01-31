@@ -53,7 +53,7 @@ export function activate(context: vscode.ExtensionContext) {
 			const results = await analyzer.analyzeWorkspace(workspaceFolder.uri.fsPath);
 			updateDiagnostics(results);
 			showAnalysisResults(results);
-			updateWebview(results);
+			updateWebview(results, context);
 
 			outputChannel.appendLine('Analysis completed.');
 		} catch (error) {
@@ -121,7 +121,7 @@ function getInitialHtml(hasWorkspace: boolean): string {
 		</html>`;
 }
 
-function updateWebview(results: AnalysisResult[]) {
+function updateWebview(results: AnalysisResult[], context: vscode.ExtensionContext) {
 	if (!currentWebview) {
 		return;
 	}
@@ -205,7 +205,7 @@ function updateWebview(results: AnalysisResult[]) {
 						<span class="arrow">▶</span> ${fileName}
 					</div>
 					<div class="file-content">
-						<a class="file-path" href="vscode://file/${result.testFilePath.replace(/\\/g, '/')}">${result.testFilePath}</a>
+						<a class="file-path" data-path="${result.testFilePath}">${result.testFilePath}</a>
 						${result.errors.map(error => `<div class="error">❌ ${error.message}</div>`).join('')}
 					</div>
 				</div>`;
@@ -224,11 +224,35 @@ function updateWebview(results: AnalysisResult[]) {
 				content.style.display = isExpanded ? 'none' : 'block';
 				arrow.textContent = isExpanded ? '▶' : '▼';
 			}
+
+			const vscode = acquireVsCodeApi();
+			document.addEventListener('click', (e) => {
+				if (e.target.classList.contains('file-path')) {
+					e.preventDefault();
+					vscode.postMessage({
+						command: 'openFile',
+						filePath: e.target.dataset.path
+					});
+				}
+			});
 		</script>
 		</body>
 		</html>`;
 
 	currentWebview.webview.html = html;
+
+	// Handle messages from the webview
+	currentWebview.webview.onDidReceiveMessage(
+		message => {
+			switch (message.command) {
+				case 'openFile':
+					vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.filePath));
+					return;
+			}
+		},
+		undefined,
+		context.subscriptions
+	);
 }
 
 function updateDiagnostics(results: AnalysisResult[]) {
