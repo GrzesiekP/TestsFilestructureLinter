@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import { TestStructureAnalyzer } from './analyzer/testStructureAnalyzer';
 import { AnalysisResult } from './analyzer/types';
+import * as path from 'path';
 
 let outputChannel: vscode.OutputChannel;
 let diagnosticCollection: vscode.DiagnosticCollection;
@@ -14,7 +15,6 @@ export function activate(context: vscode.ExtensionContext) {
 	outputChannel = vscode.window.createOutputChannel('Test Filestructure Analyzer');
 	diagnosticCollection = vscode.languages.createDiagnosticCollection('testFilestructure');
 
-
 	const analyzer = new TestStructureAnalyzer();
 
 	// Register webview provider
@@ -23,12 +23,9 @@ export function activate(context: vscode.ExtensionContext) {
 			resolveWebviewView(webviewView) {
 				webviewView.webview.options = {
 					enableScripts: true
-
 				};
 				
 				updateInitialView();
-
-				// Store the webview
 				currentWebview = webviewView;
 
 				// Update view when workspace folders change
@@ -75,73 +72,7 @@ function updateInitialView() {
 	}
 
 	const hasWorkspace = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0;
-	currentWebview.webview.html = getInitialHtml(hasWorkspace ? true : false);
-}
-
-function updateWebview(results: AnalysisResult[]) {
-	if (!currentWebview) {
-		return;
-	}
-
-	const issueCount = results.reduce((count, result) => count + result.errors.length, 0);
-	
-	let html = `<!DOCTYPE html>
-		<html>
-		<head>
-			<style>
-				body { 
-					padding: 10px; 
-					color: var(--vscode-foreground);
-					font-family: var(--vscode-font-family);
-					background-color: var(--vscode-editor-background);
-				}
-				.error { color: var(--vscode-errorForeground); }
-				.file-path { color: var(--vscode-textLink-foreground); }
-				.suggestion { 
-					color: var(--vscode-notificationsInfoIcon-foreground);
-					margin-left: 20px;
-				}
-				.summary { 
-					margin-bottom: 20px;
-					padding: 10px;
-					background-color: var(--vscode-editor-inactiveSelectionBackground);
-					border-radius: 4px;
-				}
-				.no-issues { color: var(--vscode-testing-iconPassed); }
-				.file {
-					margin-bottom: 16px;
-					padding: 10px;
-					background-color: var(--vscode-editor-lineHighlightBackground);
-					border-radius: 4px;
-				}
-			</style>
-		</head>
-		<body>
-			<div class="summary">
-				${issueCount === 0 
-					? '<div class="no-issues">✓ No issues found</div>'
-					: `Found ${issueCount} issue${issueCount === 1 ? '' : 's'}`}
-			</div>`;
-
-	if (results.length > 0) {
-		for (const result of results) {
-			html += `<div class="file">
-				<div class="file-path">${result.testFilePath}</div>`;
-			
-			for (const error of result.errors) {
-				html += `<div class="error">❌ ${error.message}</div>`;
-				if (error.suggestion) {
-					html += `<div class="suggestion">💡 ${error.suggestion}</div>`;
-				}
-			}
-			
-			html += '</div>';
-		}
-	}
-
-	html += '</body></html>';
-	
-	currentWebview.webview.html = html;
+	currentWebview.webview.html = getInitialHtml(!!hasWorkspace);
 }
 
 function getInitialHtml(hasWorkspace: boolean): string {
@@ -187,7 +118,117 @@ function getInitialHtml(hasWorkspace: boolean): string {
 				</div>
 			</div>
 		</body>
-		</html>`
+		</html>`;
+}
+
+function updateWebview(results: AnalysisResult[]) {
+	if (!currentWebview) {
+		return;
+	}
+
+	const lastAnalyzedTime = new Date().toLocaleTimeString();
+	const totalFilesAnalyzed = results.reduce((count, result) => count + 1, 0);
+	const hasIssues = results.length > 0;
+
+	let html = `<!DOCTYPE html>
+		<html>
+		<head>
+			<style>
+				body { 
+					padding: 16px; 
+					color: var(--vscode-foreground);
+					font-family: var(--vscode-font-family);
+					background-color: var(--vscode-editor-background);
+				}
+				.summary {
+					padding: 12px;
+					margin-bottom: 20px;
+					border-radius: 4px;
+					border: 1px solid;
+					border-color: ${hasIssues ? 'var(--vscode-editorWarning-foreground)' : 'var(--vscode-testing-iconPassed)'};
+					background-color: ${hasIssues ? 'var(--vscode-inputValidation-warningBackground)' : 'var(--vscode-inputValidation-infoBackground)'};
+				}
+				.summary-text {
+					margin: 4px 0;
+					color: ${hasIssues ? 'var(--vscode-editorWarning-foreground)' : 'var(--vscode-testing-iconPassed)'};
+				}
+				.file-container {
+					margin-bottom: 12px;
+				}
+				.file-header {
+					cursor: pointer;
+					padding: 8px;
+					background-color: var(--vscode-editor-lineHighlightBackground);
+					border-radius: 4px;
+					user-select: none;
+				}
+				.file-header:hover {
+					background-color: var(--vscode-editor-lineHighlightBorder);
+				}
+				.file-content {
+					display: none;
+					padding: 8px 8px 8px 24px;
+				}
+				.file-path {
+					color: var(--vscode-descriptionForeground);
+					margin: 4px 0;
+					cursor: pointer;
+					text-decoration: none;
+				}
+				.file-path:hover {
+					text-decoration: underline;
+					color: var(--vscode-textLink-foreground);
+				}
+				.error {
+					color: var(--vscode-errorForeground);
+					margin: 4px 0;
+				}
+				.arrow {
+					display: inline-block;
+					width: 16px;
+				}
+			</style>
+		</head>
+		<body>
+			<div class="summary">
+				<div class="summary-text">Files analyzed: ${totalFilesAnalyzed}</div>
+				<div class="summary-text">Last analyzed at: ${lastAnalyzedTime}</div>
+				${hasIssues ? `<div class="summary-text">Issues found in ${results.length} files</div>` : ''}
+			</div>`;
+
+	if (results.length > 0) {
+		for (const result of results) {
+			const fileName = path.basename(result.testFilePath);
+			html += `
+				<div class="file-container">
+					<div class="file-header" onclick="toggleContent(this)">
+						<span class="arrow">▶</span> ${fileName}
+					</div>
+					<div class="file-content">
+						<a class="file-path" href="vscode://file/${result.testFilePath.replace(/\\/g, '/')}">${result.testFilePath}</a>
+						${result.errors.map(error => `<div class="error">❌ ${error.message}</div>`).join('')}
+					</div>
+				</div>`;
+		}
+	} else {
+		html += '<div style="color: var(--vscode-descriptionForeground);">No issues found.</div>';
+	}
+
+	html += `
+		<script>
+			function toggleContent(header) {
+				const content = header.nextElementSibling;
+				const arrow = header.querySelector('.arrow');
+				const isExpanded = content.style.display === 'block';
+				
+				content.style.display = isExpanded ? 'none' : 'block';
+				arrow.textContent = isExpanded ? '▶' : '▼';
+			}
+		</script>
+		</body>
+		</html>`;
+
+	currentWebview.webview.html = html;
 }
 
 function updateDiagnostics(results: AnalysisResult[]) {
