@@ -369,8 +369,9 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 	function hasFixableIssues() {
 		return results.some(result => 
 			result.errors.some(error => 
-				error.type === AnalysisErrorType.InvalidDirectoryStructure && 
-				error.message.includes('Test file in invalid directory')
+				(error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+				error.message.includes('Test file in invalid directory')) ||
+				error.type === AnalysisErrorType.MissingTest
 			)
 		);
 	}
@@ -378,8 +379,9 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 	function countFixableFiles(results: AnalysisResult[]): number {
 		return results.filter(result => 
 			result.errors.some(error => 
-				error.type === AnalysisErrorType.InvalidDirectoryStructure && 
-				error.message.includes('Test file in invalid directory')
+				(error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+				error.message.includes('Test file in invalid directory')) ||
+				error.type === AnalysisErrorType.MissingTest
 			)
 		).length;
 	}
@@ -675,8 +677,9 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 			function countFixableFiles(results) {
 				return results.filter(result => 
 					result.errors.some(error => 
-						error.type === AnalysisErrorType.InvalidDirectoryStructure && 
-						error.message.includes('Test file in invalid directory')
+						(error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+						error.message.includes('Test file in invalid directory')) ||
+						error.type === AnalysisErrorType.MissingTest
 					)
 				).length;
 			}
