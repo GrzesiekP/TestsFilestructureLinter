@@ -38,9 +38,9 @@ The extension supports the following settings:
 
 * `testFilestructureLinter.ignoredDirectories`: Array of directory names to ignore during analysis (default: ["bin", "obj"])
 * `testFilestructureLinter.testFileSuffixes`: Array of valid test file suffixes (default: ["Tests"]). Case insensitive.
+* `testFilestructureLinter.testProjectSuffix`: Suffix used to identify test projects (default: ".Tests"). Case sensitive.
 
 Other default settings:
-- Test projects must end with ".Tests"
 - Source files must have ".cs" extension
 
 You can modify these settings in VS Code's settings.json file or through the Settings UI (File > Preferences > Settings).
@@ -58,7 +58,8 @@ Example configuration in settings.json:
         "Tests",
         "Test",
         "Fixture"
-    ]
+    ],
+    "testFilestructureLinter.testProjectSuffix": ".UnitTests"
 }
 ```
 

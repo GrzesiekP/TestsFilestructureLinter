@@ -12,12 +12,17 @@ export class TestStructureAnalyzer {
 
     private getIgnoredDirectories(): string[] {
         const config = vscode.workspace.getConfiguration('testFilestructureLinter');
-        return config.get<string[]>('ignoredDirectories') ?? [];
+        return config.get<string[]>('ignoredDirectories') ?? ['bin', 'obj'];
     }
 
     private getTestFileSuffixes(): string[] {
         const config = vscode.workspace.getConfiguration('testFilestructureLinter');
-        return config.get<string[]>('testFileSuffixes') ?? [];
+        return config.get<string[]>('testFileSuffixes') ?? ['Tests'];
+    }
+
+    private getTestProjectSuffix(): string {
+        const config = vscode.workspace.getConfiguration('testFilestructureLinter');
+        return config.get<string>('testProjectSuffix') ?? '';
     }
 
     private isIgnoredDirectory(dirName: string): boolean {
@@ -29,6 +34,11 @@ export class TestStructureAnalyzer {
         return this.getTestFileSuffixes().some(suffix => 
             fileNameWithoutExtension.toLowerCase().endsWith(suffix.toLowerCase())
         );
+    }
+
+    private isTestProject(dirName: string): boolean {
+        const suffix = this.getTestProjectSuffix();
+        return suffix ? dirName.endsWith(suffix) : false;
     }
 
     private getTestedClassName(testFileName: string): string {
@@ -68,7 +78,7 @@ export class TestStructureAnalyzer {
         for (const entry of entries) {
             if (entry.isDirectory() && !this.isIgnoredDirectory(entry.name)) {
                 const fullPath = path.join(workspacePath, entry.name);
-                if (entry.name.endsWith('.Tests')) {
+                if (this.isTestProject(entry.name)) {
                     projects.push(fullPath);
                 } else {
                     // Recursively search in subdirectories
@@ -197,7 +207,7 @@ export class TestStructureAnalyzer {
         testedClassName: string
     ): Promise<AnalysisError | null> {
         const relativeTestPath = path.relative(testProjectPath, testFilePath);
-        const sourceProjectName = path.basename(testProjectPath).replace('.Tests', '');
+        const sourceProjectName = path.basename(testProjectPath).replace(this.getTestProjectSuffix(), '');
         
         // Get the directory structure without the file name
         const relativeDir = path.dirname(relativeTestPath);
@@ -239,7 +249,5 @@ export class TestStructureAnalyzer {
                 };
             }
         }
-
-        return null;
     }
 } 

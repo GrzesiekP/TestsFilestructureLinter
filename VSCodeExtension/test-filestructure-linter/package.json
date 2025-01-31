@@ -53,6 +53,11 @@
           },
           "default": ["Tests"],
           "description": "List of valid test file suffixes (e.g. ['Tests', 'Test']). Case insensitive."
+        },
+        "testFilestructureLinter.testProjectSuffix": {
+          "type": "string",
+          "default": ".Tests",
+          "description": "Suffix used to identify test projects (e.g. '.Tests', '.UnitTests'). Case sensitive."
         }
       }
     },
