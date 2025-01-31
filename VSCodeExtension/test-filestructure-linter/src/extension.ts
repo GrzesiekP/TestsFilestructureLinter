@@ -287,6 +287,39 @@ async function ensureDirectoryExists(dirPath: string): Promise<void> {
 	}
 }
 
+async function updateNamespace(filePath: string, sourceFile: string, workspacePath: string, testProjectPath: string): Promise<void> {
+	const fileContent = (await vscode.workspace.fs.readFile(vscode.Uri.file(filePath))).toString();
+	const lines = fileContent.split('\n');
+	
+	// Find namespace line
+	const namespaceLineIndex = lines.findIndex(line => line.trim().startsWith('namespace'));
+	if (namespaceLineIndex === -1) return;
+
+	// Get source project and relative path
+	const sourceRoot = path.join(workspacePath, 'src');
+	const relativeSourcePath = path.relative(sourceRoot, path.dirname(sourceFile));
+	const pathParts = relativeSourcePath.split(path.sep);
+	const sourceProjectName = pathParts[0];
+	const remainingPath = pathParts.slice(1).join('.');
+
+	// Construct new namespace
+	const testProjectName = sourceProjectName + '.Tests';
+	const newNamespace = remainingPath 
+		? `${testProjectName}.${remainingPath}` 
+		: testProjectName;
+
+	// Replace old namespace with new one
+	const oldLine = lines[namespaceLineIndex];
+	const indentation = oldLine.match(/^\s*/)?.[0] || '';
+	lines[namespaceLineIndex] = `${indentation}namespace ${newNamespace};`;
+
+	// Write updated content back to file
+	await vscode.workspace.fs.writeFile(
+		vscode.Uri.file(filePath),
+		Buffer.from(lines.join('\n'), 'utf8')
+	);
+}
+
 async function moveTestFile(testFilePath: string, sourceFile: string, workspacePath: string): Promise<void> {
 	const analyzer = new TestStructureAnalyzer();
 	const testProjects = await analyzer.findTestProjects(path.join(workspacePath, analyzer.getTestRoot()));
@@ -306,6 +339,9 @@ async function moveTestFile(testFilePath: string, sourceFile: string, workspaceP
 		vscode.Uri.file(expectedTestPath),
 		{ overwrite: false }
 	);
+
+	// Update namespace in the moved file
+	await updateNamespace(expectedTestPath, sourceFile, workspacePath, testProjects[0]);
 
 	vscode.window.showInformationMessage(`Successfully moved test file to: ${expectedTestPath}`);
 }
