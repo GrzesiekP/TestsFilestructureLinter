@@ -122,6 +122,76 @@ function getInitialHtml(hasWorkspace: boolean): string {
 		</html>`;
 }
 
+async function handleFixAction(filePath: string) {
+	try {
+		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+		if (!workspaceFolder) {
+			vscode.window.showErrorMessage('No workspace folder found.');
+			return;
+		}
+
+		const analyzer = new TestStructureAnalyzer();
+		const results = await analyzer.analyzeWorkspace(workspaceFolder.uri.fsPath);
+		const fileToFix = results.find(r => r.testFilePath === filePath);
+
+		if (!fileToFix) {
+			vscode.window.showErrorMessage('Could not find file to fix.');
+			return;
+		}
+
+		const testFileName = path.basename(filePath);
+		const testedClassName = testFileName.replace('Tests.cs', '');
+		const sourceFile = await findSourceFile(workspaceFolder.uri.fsPath, testedClassName);
+
+		if (!sourceFile) {
+			vscode.window.showErrorMessage('Could not find source file.');
+			return;
+		}
+
+		// Calculate the correct test file path based on source file location
+		const sourceRelativePath = path.relative(path.join(workspaceFolder.uri.fsPath, 'src', 'Application'), path.dirname(sourceFile));
+		const newTestFilePath = path.join(
+			workspaceFolder.uri.fsPath,
+			'tests',
+			'Application.Tests',
+			sourceRelativePath,
+			testFileName
+		);
+
+		// Create directory if it doesn't exist
+		await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(newTestFilePath)));
+
+		// Move the file
+		await vscode.workspace.fs.rename(
+			vscode.Uri.file(filePath),
+			vscode.Uri.file(newTestFilePath),
+			{ overwrite: false }
+		);
+
+		// Refresh the view
+		vscode.commands.executeCommand('test-filestructure-linter.analyze');
+		vscode.window.showInformationMessage(`Successfully moved test file to: ${newTestFilePath}`);
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		vscode.window.showErrorMessage(`Failed to fix file: ${errorMessage}`);
+	}
+}
+
+async function handleFixAllAction(filePaths: string[]) {
+	for (const filePath of filePaths) {
+		await handleFixAction(filePath);
+	}
+}
+
+async function findSourceFile(workspacePath: string, className: string): Promise<string | undefined> {
+	const files = await vscode.workspace.findFiles(
+		`src/**/${className}.cs`,
+		'**/bin/**,**/obj/**'
+	);
+	
+	return files[0]?.fsPath;
+}
+
 function updateWebview(results: AnalysisResult[], context: vscode.ExtensionContext) {
 	if (!currentWebview) {
 		return;
@@ -426,15 +496,18 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 
 	currentWebview.webview.html = html;
 
-	// Handle messages from the webview
+	// Update the message handler
 	currentWebview.webview.onDidReceiveMessage(
-		message => {
+		async message => {
 			switch (message.command) {
 				case 'openFile':
 					vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.filePath));
 					return;
 				case 'fix':
-					// Handle fix action here
+					await handleFixAction(message.filePath);
+					return;
+				case 'fixAll':
+					await handleFixAllAction(message.filePaths);
 					return;
 			}
 		},
