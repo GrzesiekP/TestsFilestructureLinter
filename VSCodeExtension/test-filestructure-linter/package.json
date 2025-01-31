@@ -64,6 +64,11 @@
           "default": false,
           "description": "Enable validation to check if source files have corresponding test files"
         },
+        "testFilestructureLinter.showDiagnosticErrors": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show diagnostic errors in the editor when opening files"
+        },
         "testFilestructureLinter.testFileSuffixes": {
           "type": "array",
           "items": {
