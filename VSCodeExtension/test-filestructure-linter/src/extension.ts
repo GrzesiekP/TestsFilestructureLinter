@@ -2,9 +2,8 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { TestStructureAnalyzer } from './analyzer/testStructureAnalyzer';
-import { AnalysisResult } from './analyzer/types';
+import { AnalysisResult, AnalysisErrorType } from './analyzer/types';
 import * as path from 'path';
-import { AnalysisErrorType } from './analyzer/types';
 
 let outputChannel: vscode.OutputChannel;
 let diagnosticCollection: vscode.DiagnosticCollection;
@@ -354,6 +353,23 @@ async function findSourceFile(workspacePath: string, className: string): Promise
 	return files[0]?.fsPath;
 }
 
+function getFixButtonTooltip(isMissingTest: boolean, results: AnalysisResult[], testFilePath: string): string {
+	if (!isMissingTest) {
+		return 'Move test file to the correct location';
+	}
+	
+	const hasMisplacedTest = results.some(r => 
+		r.errors.some(e => 
+			e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+			path.basename(r.testFilePath, '.cs').replace('Tests', '') === path.basename(testFilePath, '.cs')
+		)
+	);
+	
+	return hasMisplacedTest 
+		? 'Move existing test file to the correct location' 
+		: 'Create a new test file in the correct location';
+}
+
 function updateWebview(results: AnalysisResult[], context: vscode.ExtensionContext) {
 	if (!currentWebview) {
 		return;
@@ -633,6 +649,8 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 				error.type === AnalysisErrorType.MissingTest
 			);
 
+			const tooltip = getFixButtonTooltip(isMissingTest, results, result.testFilePath);
+
 			html += `
 				<div class="file-container">
 					<div class="file-header" onclick="toggleContent(this)">
@@ -643,15 +661,7 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 							`<button class="fix-button" 
 								data-error-type="${isMissingTest ? AnalysisErrorType.MissingTest : AnalysisErrorType.InvalidDirectoryStructure}" 
 								data-file-path="${result.testFilePath}"
-								title="${isMissingTest ? 
-									// For missing test, check if there's a misplaced test file
-									results.some(r => 
-										r.errors.some(e => 
-											e.type === AnalysisErrorType.InvalidDirectoryStructure &&
-											path.basename(r.testFilePath, '.cs').replace('Tests', '') === path.basename(result.testFilePath, '.cs')
-										)
-									) ? 'Move existing test file to the correct location' : 'Create a new test file in the correct location'
-									: 'Move test file to the correct location'}">
+								title="${tooltip}">
 								Fix
 							</button>` : 
 							''}
