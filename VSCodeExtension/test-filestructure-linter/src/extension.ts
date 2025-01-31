@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { TestStructureAnalyzer } from './analyzer/testStructureAnalyzer';
 import { AnalysisResult } from './analyzer/types';
 import * as path from 'path';
+import { AnalysisErrorType } from './analyzer/types';
 
 let outputChannel: vscode.OutputChannel;
 let diagnosticCollection: vscode.DiagnosticCollection;
@@ -126,6 +127,9 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 		return;
 	}
 
+	const config = vscode.workspace.getConfiguration('testFilestructureLinter');
+	const experimentalFixesEnabled = config.get<boolean>('enableExperimentalFixes') ?? false;
+
 	const lastAnalyzedTime = new Date().toLocaleTimeString();
 	const totalFilesAnalyzed = results.reduce((count, result) => count + 1, 0);
 	const hasIssues = results.length > 0;
@@ -135,14 +139,14 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 		<head>
 			<style>
 				body { 
-					padding: 16px; 
+					padding: 0; 
 					color: var(--vscode-foreground);
 					font-family: var(--vscode-font-family);
 					background-color: var(--vscode-editor-background);
 				}
 				.summary {
 					padding: 12px;
-					margin-bottom: 20px;
+					margin: 8px 12px 16px;
 					border-radius: 4px;
 					border: 1px solid;
 					border-color: ${hasIssues ? 'var(--vscode-editorWarning-foreground)' : 'var(--vscode-testing-iconPassed)'};
@@ -152,40 +156,114 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					margin: 4px 0;
 					color: ${hasIssues ? 'var(--vscode-editorWarning-foreground)' : 'var(--vscode-testing-iconPassed)'};
 				}
+				.tree {
+					padding: 0;
+				}
 				.file-container {
-					margin-bottom: 12px;
+					margin: 0;
 				}
 				.file-header {
 					cursor: pointer;
-					padding: 8px;
-					background-color: var(--vscode-editor-lineHighlightBackground);
-					border-radius: 4px;
+					padding: 3px 0 3px 16px;
 					user-select: none;
+					display: flex;
+					align-items: center;
+					height: 22px;
+					color: var(--vscode-foreground);
+					line-height: 22px;
+					font-size: 13px;
 				}
 				.file-header:hover {
-					background-color: var(--vscode-editor-lineHighlightBorder);
+					background-color: var(--vscode-list-hoverBackground);
+				}
+				.file-header.expanded {
+					background-color: var(--vscode-list-activeSelectionBackground);
+					color: var(--vscode-list-activeSelectionForeground);
 				}
 				.file-content {
 					display: none;
-					padding: 8px 8px 8px 24px;
+					margin-left: 16px;
 				}
 				.file-path {
 					color: var(--vscode-descriptionForeground);
-					margin: 4px 0;
+					padding: 3px 0 3px 16px;
 					cursor: pointer;
 					text-decoration: none;
+					word-break: break-word;
+					display: block;
+					min-height: 22px;
+					line-height: 22px;
+					font-size: 13px;
+					white-space: normal;
 				}
 				.file-path:hover {
+					background-color: var(--vscode-list-hoverBackground);
 					text-decoration: underline;
 					color: var(--vscode-textLink-foreground);
 				}
 				.error {
 					color: var(--vscode-errorForeground);
-					margin: 4px 0;
+					padding: 3px 0 3px 16px;
+					display: flex;
+					align-items: flex-start;
+					gap: 6px;
+					min-height: 22px;
+					line-height: 22px;
+					font-size: 13px;
+					position: relative;
+					white-space: normal;
+				}
+				.error:hover {
+					background-color: var(--vscode-list-hoverBackground);
+				}
+				.error-message {
+					flex-grow: 1;
+					padding-right: 8px;
+					padding-left: 20px;
+					white-space: normal;
+					word-break: break-word;
+				}
+				.error-icon {
+					flex-shrink: 0;
+					color: var(--vscode-errorForeground);
+					font-size: 16px;
+					line-height: 22px;
+					margin-right: 4px;
+				}
+				.fix-button {
+					background-color: var(--vscode-button-background);
+					color: var(--vscode-button-foreground);
+					border: none;
+					padding: 2px 8px;
+					border-radius: 2px;
+					cursor: pointer;
+					font-size: 11px;
+					display: ${experimentalFixesEnabled ? 'inline-block' : 'none'};
+					white-space: nowrap;
+					margin-right: 8px;
+					flex-shrink: 0;
+					height: 18px;
+					line-height: 18px;
+				}
+				.fix-button:hover {
+					background-color: var(--vscode-button-hoverBackground);
 				}
 				.arrow {
-					display: inline-block;
+					display: inline-flex;
 					width: 16px;
+					height: 16px;
+					justify-content: center;
+					align-items: center;
+					margin-right: 4px;
+					font-size: 16px;
+					line-height: 22px;
+				}
+				.no-issues {
+					padding: 3px 0 3px 16px;
+					color: var(--vscode-descriptionForeground);
+					height: 22px;
+					line-height: 22px;
+					font-size: 13px;
 				}
 			</style>
 		</head>
@@ -194,7 +272,8 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 				<div class="summary-text">Files analyzed: ${totalFilesAnalyzed}</div>
 				<div class="summary-text">Last analyzed at: ${lastAnalyzedTime}</div>
 				${hasIssues ? `<div class="summary-text">Issues found in ${results.length} files</div>` : ''}
-			</div>`;
+			</div>
+			<div class="tree">`;
 
 	if (results.length > 0) {
 		for (const result of results) {
@@ -202,36 +281,52 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 			html += `
 				<div class="file-container">
 					<div class="file-header" onclick="toggleContent(this)">
-						<span class="arrow">▶</span> ${fileName}
+						${fileName}
 					</div>
 					<div class="file-content">
 						<a class="file-path" data-path="${result.testFilePath}">${result.testFilePath}</a>
-						${result.errors.map(error => `<div class="error">❌ ${error.message}</div>`).join('')}
+						${result.errors.map(error => {
+							const isFixableError = error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+								error.message.includes('Test file in invalid directory');
+							return `<div class="error">
+								<span>⚠</span>
+								<div class="error-message">${error.message}</div>
+								${isFixableError ? `<button class="fix-button" data-error-type="${error.type}" data-file-path="${result.testFilePath}">Fix</button>` : ''}
+							</div>`;
+						}).join('')}
 					</div>
 				</div>`;
 		}
 	} else {
-		html += '<div style="color: var(--vscode-descriptionForeground);">No issues found.</div>';
+		html += '<div class="no-issues">No issues found.</div>';
 	}
 
-	html += `
+	html += `</div>
 		<script>
+			const vscode = acquireVsCodeApi();
+
 			function toggleContent(header) {
 				const content = header.nextElementSibling;
-				const arrow = header.querySelector('.arrow');
 				const isExpanded = content.style.display === 'block';
 				
 				content.style.display = isExpanded ? 'none' : 'block';
-				arrow.textContent = isExpanded ? '▶' : '▼';
+				header.classList.toggle('expanded', !isExpanded);
 			}
 
-			const vscode = acquireVsCodeApi();
 			document.addEventListener('click', (e) => {
 				if (e.target.classList.contains('file-path')) {
 					e.preventDefault();
 					vscode.postMessage({
 						command: 'openFile',
 						filePath: e.target.dataset.path
+					});
+				} else if (e.target.classList.contains('fix-button')) {
+					e.preventDefault();
+					const button = e.target;
+					vscode.postMessage({
+						command: 'fix',
+						errorType: button.dataset.errorType,
+						filePath: button.dataset.filePath
 					});
 				}
 			});
@@ -247,6 +342,9 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 			switch (message.command) {
 				case 'openFile':
 					vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.filePath));
+					return;
+				case 'fix':
+					// Handle fix action here
 					return;
 			}
 		},

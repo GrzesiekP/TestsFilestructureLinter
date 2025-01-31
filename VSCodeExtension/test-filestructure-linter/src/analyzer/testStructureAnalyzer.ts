@@ -35,6 +35,11 @@ export class TestStructureAnalyzer {
         return config.get<string>('testRoot') ?? '';
     }
 
+    private isExperimentalFixesEnabled(): boolean {
+        const config = vscode.workspace.getConfiguration('testFilestructureLinter');
+        return config.get<boolean>('enableExperimentalFixes') ?? false;
+    }
+
     private isIgnoredDirectory(dirName: string): boolean {
         return this.getIgnoredDirectories().includes(dirName);
     }

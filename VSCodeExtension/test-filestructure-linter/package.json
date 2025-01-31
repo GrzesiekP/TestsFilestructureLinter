@@ -44,7 +44,12 @@
             "type": "string"
           },
           "default": ["bin", "obj"],
-          "description": "List of directories that should be ignored during test file analysis."
+          "description": "Directories to ignore during analysis"
+        },
+        "testFilestructureLinter.enableExperimentalFixes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable experimental features for fixing test structure issues automatically"
         },
         "testFilestructureLinter.testFileSuffixes": {
           "type": "array",
