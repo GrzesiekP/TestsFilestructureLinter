@@ -636,10 +636,35 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					line-height: 14px;
 					font-family: var(--vscode-font-family);
 					align-self: flex-start;
+					position: relative;
+					min-width: 60px;
 				}
-				.fix-all-button:hover {
+				.fix-all-button:disabled {
+					opacity: 0.5;
+					cursor: not-allowed;
+				}
+				.fix-all-button:hover:not(:disabled) {
 					background-color: var(--vscode-button-secondaryHoverBackground);
 					color: var(--vscode-button-secondaryForeground);
+				}
+				.fix-all-button.fixing {
+					padding-right: 24px;
+				}
+				.fix-all-button .fix-spinner {
+					display: none;
+					width: 12px;
+					height: 12px;
+					border: 2px solid var(--vscode-button-secondaryForeground);
+					border-radius: 50%;
+					border-top-color: transparent;
+					animation: spin 1s linear infinite;
+					position: absolute;
+					right: 6px;
+					top: 50%;
+					transform: translateY(-50%);
+				}
+				.fix-all-button.fixing .fix-spinner {
+					display: block;
 				}
 			</style>
 		</head>
@@ -657,7 +682,8 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					</div>
 					${hasFixableIssues() ? 
 						`<button class="fix-all-button" title="Fix all issues by creating missing test files and moving misplaced test files to their correct locations">
-							Fix All
+							<span class="button-text">Fix All</span>
+							<div class="fix-spinner"></div>
 						</button>` : ''}
 				</div>
 			</div>
@@ -758,8 +784,21 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 						errorType: button.dataset.errorType,
 						filePath: button.dataset.filePath
 					});
-				} else if (e.target.classList.contains('fix-all-button')) {
+				} else if (e.target.closest('.fix-all-button')) {
 					e.preventDefault();
+					const button = e.target.closest('.fix-all-button');
+					if (button.disabled) return;
+
+					// Disable Fix All button and show loading state
+					button.disabled = true;
+					button.classList.add('fixing');
+					button.querySelector('.button-text').textContent = 'Fixing...';
+
+					// Disable all individual Fix buttons
+					document.querySelectorAll('.fix-button').forEach(btn => {
+						btn.disabled = true;
+					});
+					
 					vscode.postMessage({
 						command: 'fixAll'
 					});
