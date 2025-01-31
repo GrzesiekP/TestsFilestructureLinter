@@ -134,6 +134,24 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 	const totalFilesAnalyzed = results.reduce((count, result) => count + 1, 0);
 	const hasIssues = results.length > 0;
 
+	function hasFixableIssues() {
+		return results.some(result => 
+			result.errors.some(error => 
+				error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+				error.message.includes('Test file in invalid directory')
+			)
+		);
+	}
+
+	function countFixableFiles(results: AnalysisResult[]): number {
+		return results.filter(result => 
+			result.errors.some(error => 
+				error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+				error.message.includes('Test file in invalid directory')
+			)
+		).length;
+	}
+
 	let html = `<!DOCTYPE html>
 		<html>
 		<head>
@@ -151,6 +169,19 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					border: 1px solid;
 					border-color: ${hasIssues ? 'var(--vscode-editorWarning-foreground)' : 'var(--vscode-testing-iconPassed)'};
 					background-color: ${hasIssues ? 'var(--vscode-inputValidation-warningBackground)' : 'var(--vscode-inputValidation-infoBackground)'};
+					display: flex;
+					flex-direction: column;
+					gap: 4px;
+				}
+				.summary-header {
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+				}
+				.summary-stats {
+					display: flex;
+					flex-direction: column;
+					gap: 4px;
 				}
 				.summary-text {
 					margin: 4px 0;
@@ -172,6 +203,12 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					color: var(--vscode-foreground);
 					line-height: 22px;
 					font-size: 13px;
+					justify-content: space-between;
+				}
+				.file-header-content {
+					display: flex;
+					align-items: center;
+					gap: 8px;
 				}
 				.file-header:hover {
 					background-color: var(--vscode-list-hoverBackground);
@@ -202,7 +239,7 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					color: var(--vscode-textLink-foreground);
 				}
 				.error {
-					color: var(--vscode-errorForeground);
+					color: var(--vscode-editorWarning-foreground);
 					padding: 3px 0 3px 16px;
 					display: flex;
 					align-items: flex-start;
@@ -225,28 +262,30 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 				}
 				.error-icon {
 					flex-shrink: 0;
-					color: var(--vscode-errorForeground);
+					color: var(--vscode-editorWarning-foreground);
 					font-size: 16px;
 					line-height: 22px;
 					margin-right: 4px;
 				}
 				.fix-button {
-					background-color: var(--vscode-button-background);
-					color: var(--vscode-button-foreground);
-					border: none;
-					padding: 2px 8px;
-					border-radius: 2px;
+					background-color: var(--vscode-button-secondaryBackground);
+					color: var(--vscode-button-secondaryForeground);
+					border: 1px solid var(--vscode-button-border, transparent);
+					padding: 4px 10px;
+					border-radius: 4px;
 					cursor: pointer;
-					font-size: 11px;
+					font-size: 12px;
 					display: ${experimentalFixesEnabled ? 'inline-block' : 'none'};
 					white-space: nowrap;
 					margin-right: 8px;
 					flex-shrink: 0;
-					height: 18px;
-					line-height: 18px;
+					height: 22px;
+					line-height: 14px;
+					font-family: var(--vscode-font-family);
 				}
 				.fix-button:hover {
-					background-color: var(--vscode-button-hoverBackground);
+					background-color: var(--vscode-button-secondaryHoverBackground);
+					color: var(--vscode-button-secondaryForeground);
 				}
 				.arrow {
 					display: inline-flex;
@@ -265,35 +304,64 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					line-height: 22px;
 					font-size: 13px;
 				}
+				.fix-all-button {
+					background-color: var(--vscode-button-secondaryBackground);
+					color: var(--vscode-button-secondaryForeground);
+					border: 1px solid var(--vscode-button-border, transparent);
+					padding: 4px 10px;
+					border-radius: 4px;
+					cursor: pointer;
+					font-size: 12px;
+					display: ${experimentalFixesEnabled ? 'inline-block' : 'none'};
+					white-space: nowrap;
+					height: 24px;
+					line-height: 14px;
+					font-family: var(--vscode-font-family);
+					align-self: flex-start;
+				}
+				.fix-all-button:hover {
+					background-color: var(--vscode-button-secondaryHoverBackground);
+					color: var(--vscode-button-secondaryForeground);
+				}
 			</style>
 		</head>
 		<body>
 			<div class="summary">
-				<div class="summary-text">Files analyzed: ${totalFilesAnalyzed}</div>
-				<div class="summary-text">Last analyzed at: ${lastAnalyzedTime}</div>
-				${hasIssues ? `<div class="summary-text">Issues found in ${results.length} files</div>` : ''}
+				<div class="summary-header">
+					<div class="summary-stats">
+						<div class="summary-text">Files analyzed: ${totalFilesAnalyzed}</div>
+						<div class="summary-text">Last analyzed at: ${lastAnalyzedTime}</div>
+						${hasIssues ? `<div class="summary-text">Issues found in ${results.length} files${hasFixableIssues() ? ` (${countFixableFiles(results)} fixable)` : ''}</div>` : ''}
+					</div>
+					${hasFixableIssues() ? `<button class="fix-all-button">Fix All</button>` : ''}
+				</div>
 			</div>
 			<div class="tree">`;
 
 	if (results.length > 0) {
 		for (const result of results) {
 			const fileName = path.basename(result.testFilePath);
+			const isFixable = result.errors.some(error => 
+				error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+				error.message.includes('Test file in invalid directory')
+			);
 			html += `
 				<div class="file-container">
 					<div class="file-header" onclick="toggleContent(this)">
-						${fileName}
+						<div class="file-header-content">
+							${fileName}
+						</div>
+						${isFixable && experimentalFixesEnabled ? 
+							`<button class="fix-button" data-error-type="${AnalysisErrorType.InvalidDirectoryStructure}" data-file-path="${result.testFilePath}">Fix</button>` : 
+							''}
 					</div>
 					<div class="file-content">
 						<a class="file-path" data-path="${result.testFilePath}">${result.testFilePath}</a>
-						${result.errors.map(error => {
-							const isFixableError = error.type === AnalysisErrorType.InvalidDirectoryStructure && 
-								error.message.includes('Test file in invalid directory');
-							return `<div class="error">
-								<span>⚠</span>
+						${result.errors.map(error => `
+							<div class="error">
+								<span class="error-icon">⚠</span>
 								<div class="error-message">${error.message}</div>
-								${isFixableError ? `<button class="fix-button" data-error-type="${error.type}" data-file-path="${result.testFilePath}">Fix</button>` : ''}
-							</div>`;
-						}).join('')}
+							</div>`).join('')}
 					</div>
 				</div>`;
 		}
@@ -304,6 +372,15 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 	html += `</div>
 		<script>
 			const vscode = acquireVsCodeApi();
+
+			function countFixableFiles(results) {
+				return results.filter(result => 
+					result.errors.some(error => 
+						error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+						error.message.includes('Test file in invalid directory')
+					)
+				).length;
+			}
 
 			function toggleContent(header) {
 				const content = header.nextElementSibling;
@@ -327,6 +404,19 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 						command: 'fix',
 						errorType: button.dataset.errorType,
 						filePath: button.dataset.filePath
+					});
+				} else if (e.target.classList.contains('fix-all-button')) {
+					e.preventDefault();
+					const fixableFiles = results
+						.filter(result => result.errors.some(error => 
+							error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+							error.message.includes('Test file in invalid directory')
+						))
+						.map(result => result.testFilePath);
+					
+					vscode.postMessage({
+						command: 'fixAll',
+						filePaths: fixableFiles
 					});
 				}
 			});

@@ -154,12 +154,6 @@ export class TestStructureAnalyzer {
         const testFileName = path.basename(testFilePath);
         const testedClassName = this.getTestedClassName(testFileName);
 
-        // Validate class reference
-        const referenceError = await this.validateClassReference(testFilePath, testedClassName);
-        if (referenceError) {
-            result.errors.push(referenceError);
-        }
-
         // Validate directory structure
         const structureError = await this.validateDirectoryStructure(testFilePath, testProjectPath, workspacePath, testedClassName);
         if (structureError) {
@@ -198,24 +192,6 @@ export class TestStructureAnalyzer {
                 type: AnalysisErrorType.InvalidFileName,
                 message: `File name does not match class name. Expected: ${className}${this.options.fileExtension}, Found: ${fileName}`,
                 suggestion: `Rename file to ${className}${this.options.fileExtension}`
-            };
-        }
-
-        return null;
-    }
-
-    private async validateClassReference(testFilePath: string, testedClassName: string): Promise<AnalysisError | null> {
-        const fileContent = await fs.promises.readFile(testFilePath, 'utf8');
-
-        // Check if the tested class is referenced in the file
-        const hasReference = fileContent.includes(`${testedClassName}`) &&
-                           !fileContent.includes(`class ${testedClassName}`); // Exclude the test class itself
-
-        if (!hasReference) {
-            return {
-                type: AnalysisErrorType.MissingClassReference,
-                message: `Test file does not reference the class it's testing: ${testedClassName}`,
-                suggestion: `Add reference to ${testedClassName} class`
             };
         }
 

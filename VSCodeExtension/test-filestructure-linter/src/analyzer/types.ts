@@ -12,7 +12,6 @@ export interface AnalysisError {
 
 export enum AnalysisErrorType {
     InvalidFileName = 'InvalidFileName',
-    MissingClassReference = 'MissingClassReference',
     InvalidDirectoryStructure = 'InvalidDirectoryStructure'
 }
 
