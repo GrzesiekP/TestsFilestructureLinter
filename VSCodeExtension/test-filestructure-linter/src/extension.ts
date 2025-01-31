@@ -122,7 +122,7 @@ function getInitialHtml(hasWorkspace: boolean): string {
 		</html>`;
 }
 
-async function handleFixAction(filePath: string) {
+async function handleFixAction(filePath: string, errorType?: AnalysisErrorType) {
 	try {
 		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
 		if (!workspaceFolder) {
@@ -132,54 +132,143 @@ async function handleFixAction(filePath: string) {
 
 		const analyzer = new TestStructureAnalyzer();
 		const results = await analyzer.analyzeWorkspace(workspaceFolder.uri.fsPath);
-		const fileToFix = results.find(r => r.testFilePath === filePath);
 
-		if (!fileToFix) {
-			vscode.window.showErrorMessage('Could not find file to fix.');
-			return;
+		if (errorType === AnalysisErrorType.MissingTest) {
+			// This is a source file that needs a test
+			const sourceFile = filePath;
+			const sourceFileName = path.basename(sourceFile);
+			const className = sourceFileName.replace('.cs', '');
+
+			// First check if there's a misplaced test file
+			const misplacedTest = results.find(r => 
+				r.errors.some(e => 
+					e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+					path.basename(r.testFilePath, '.cs').replace('Tests', '') === className
+				)
+			);
+
+			if (misplacedTest) {
+				// Move the existing test file to the correct location
+				await moveTestFile(misplacedTest.testFilePath, sourceFile, workspaceFolder.uri.fsPath);
+			} else {
+				// Create a new test file
+				await createTestFile(sourceFile, workspaceFolder.uri.fsPath);
+			}
+		} else {
+			// This is a test file that needs to be moved
+			const fileToFix = results.find(r => r.testFilePath === filePath);
+			if (!fileToFix) {
+				vscode.window.showErrorMessage('Could not find file to fix.');
+				return;
+			}
+
+			const testFileName = path.basename(filePath);
+			const testedClassName = testFileName.replace('Tests.cs', '');
+			const sourceFile = await findSourceFile(workspaceFolder.uri.fsPath, testedClassName);
+
+			if (!sourceFile) {
+				vscode.window.showErrorMessage('Could not find source file.');
+				return;
+			}
+
+			await moveTestFile(filePath, sourceFile, workspaceFolder.uri.fsPath);
 		}
-
-		const testFileName = path.basename(filePath);
-		const testedClassName = testFileName.replace('Tests.cs', '');
-		const sourceFile = await findSourceFile(workspaceFolder.uri.fsPath, testedClassName);
-
-		if (!sourceFile) {
-			vscode.window.showErrorMessage('Could not find source file.');
-			return;
-		}
-
-		// Calculate the correct test file path based on source file location
-		const sourceRelativePath = path.relative(path.join(workspaceFolder.uri.fsPath, 'src', 'Application'), path.dirname(sourceFile));
-		const newTestFilePath = path.join(
-			workspaceFolder.uri.fsPath,
-			'tests',
-			'Application.Tests',
-			sourceRelativePath,
-			testFileName
-		);
-
-		// Create directory if it doesn't exist
-		await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(newTestFilePath)));
-
-		// Move the file
-		await vscode.workspace.fs.rename(
-			vscode.Uri.file(filePath),
-			vscode.Uri.file(newTestFilePath),
-			{ overwrite: false }
-		);
 
 		// Refresh the view
 		vscode.commands.executeCommand('test-filestructure-linter.analyze');
-		vscode.window.showInformationMessage(`Successfully moved test file to: ${newTestFilePath}`);
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		vscode.window.showErrorMessage(`Failed to fix file: ${errorMessage}`);
 	}
 }
 
-async function handleFixAllAction(filePaths: string[]) {
-	for (const filePath of filePaths) {
-		await handleFixAction(filePath);
+async function createTestFile(sourceFile: string, workspacePath: string): Promise<void> {
+	const analyzer = new TestStructureAnalyzer();
+	const testProjects = await analyzer.findTestProjects(path.join(workspacePath, analyzer.getTestRoot()));
+	if (testProjects.length === 0) {
+		throw new Error('No test projects found.');
+	}
+
+	const expectedTestPath = analyzer.getExpectedTestPath(sourceFile, workspacePath, testProjects[0]);
+	
+	// Create directory if it doesn't exist
+	await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(expectedTestPath)));
+
+	// Create empty test file
+	await vscode.workspace.fs.writeFile(
+		vscode.Uri.file(expectedTestPath),
+		Buffer.from('', 'utf8')
+	);
+
+	vscode.window.showInformationMessage(`Created test file at: ${expectedTestPath}`);
+}
+
+async function moveTestFile(testFilePath: string, sourceFile: string, workspacePath: string): Promise<void> {
+	const analyzer = new TestStructureAnalyzer();
+	const testProjects = await analyzer.findTestProjects(path.join(workspacePath, analyzer.getTestRoot()));
+	if (testProjects.length === 0) {
+		throw new Error('No test projects found.');
+	}
+
+	const expectedTestPath = analyzer.getExpectedTestPath(sourceFile, workspacePath, testProjects[0]);
+
+	// Create directory if it doesn't exist
+	await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(expectedTestPath)));
+
+	// Move the file
+	await vscode.workspace.fs.rename(
+		vscode.Uri.file(testFilePath),
+		vscode.Uri.file(expectedTestPath),
+		{ overwrite: false }
+	);
+
+	vscode.window.showInformationMessage(`Successfully moved test file to: ${expectedTestPath}`);
+}
+
+async function handleFixAllAction(filePaths: string[], context: vscode.ExtensionContext) {
+	try {
+		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+		if (!workspaceFolder) {
+			vscode.window.showErrorMessage('No workspace folder found.');
+			return;
+		}
+
+		const analyzer = new TestStructureAnalyzer();
+		const results = await analyzer.analyzeWorkspace(workspaceFolder.uri.fsPath);
+
+		// Collect all fixable files
+		const filesToFix = results.filter(result => {
+			const isInvalidDir = result.errors.some(error => 
+				error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+				error.message.includes('Test file in invalid directory')
+			);
+			const isMissingTest = result.errors.some(error => 
+				error.type === AnalysisErrorType.MissingTest
+			);
+			return isInvalidDir || isMissingTest;
+		});
+
+		// Fix each file
+		for (const fileToFix of filesToFix) {
+			const isMissingTest = fileToFix.errors.some(error => 
+				error.type === AnalysisErrorType.MissingTest
+			);
+			await handleFixAction(fileToFix.testFilePath, 
+				isMissingTest ? AnalysisErrorType.MissingTest : AnalysisErrorType.InvalidDirectoryStructure
+			);
+		}
+
+		// Show success message
+		vscode.window.showInformationMessage('All Fixed');
+
+		// Update the view by removing fixed files
+		const remainingResults = results.filter(result => !filesToFix.includes(result));
+		updateDiagnostics(remainingResults);
+		showAnalysisResults(remainingResults);
+		updateWebview(remainingResults, context);
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		vscode.window.showErrorMessage(`Failed to fix all files: ${errorMessage}`);
 	}
 }
 
@@ -415,14 +504,18 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 				error.type === AnalysisErrorType.InvalidDirectoryStructure && 
 				error.message.includes('Test file in invalid directory')
 			);
+			const isMissingTest = result.errors.some(error => 
+				error.type === AnalysisErrorType.MissingTest
+			);
+
 			html += `
 				<div class="file-container">
 					<div class="file-header" onclick="toggleContent(this)">
 						<div class="file-header-content">
 							${fileName}
 						</div>
-						${isFixable && experimentalFixesEnabled ? 
-							`<button class="fix-button" data-error-type="${AnalysisErrorType.InvalidDirectoryStructure}" data-file-path="${result.testFilePath}">Fix</button>` : 
+						${(isFixable || isMissingTest) && experimentalFixesEnabled ? 
+							`<button class="fix-button" data-error-type="${isMissingTest ? AnalysisErrorType.MissingTest : AnalysisErrorType.InvalidDirectoryStructure}" data-file-path="${result.testFilePath}">Fix</button>` : 
 							''}
 					</div>
 					<div class="file-content">
@@ -477,16 +570,8 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					});
 				} else if (e.target.classList.contains('fix-all-button')) {
 					e.preventDefault();
-					const fixableFiles = results
-						.filter(result => result.errors.some(error => 
-							error.type === AnalysisErrorType.InvalidDirectoryStructure && 
-							error.message.includes('Test file in invalid directory')
-						))
-						.map(result => result.testFilePath);
-					
 					vscode.postMessage({
-						command: 'fixAll',
-						filePaths: fixableFiles
+						command: 'fixAll'
 					});
 				}
 			});
@@ -504,10 +589,10 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.filePath));
 					return;
 				case 'fix':
-					await handleFixAction(message.filePath);
+					await handleFixAction(message.filePath, message.errorType);
 					return;
 				case 'fixAll':
-					await handleFixAllAction(message.filePaths);
+					await handleFixAllAction(message.filePaths, context);
 					return;
 			}
 		},

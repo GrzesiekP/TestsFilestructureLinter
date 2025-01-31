@@ -30,7 +30,7 @@ export class TestStructureAnalyzer {
         return config.get<string>('sourceRoot') ?? '';
     }
 
-    private getTestRoot(): string {
+    public getTestRoot(): string {
         const config = vscode.workspace.getConfiguration('testFilestructureLinter');
         return config.get<string>('testRoot') ?? '';
     }
@@ -107,7 +107,7 @@ export class TestStructureAnalyzer {
         }
     }
 
-    private getExpectedTestPath(sourceFilePath: string, workspacePath: string, testProjectPath: string): string {
+    public getExpectedTestPath(sourceFilePath: string, workspacePath: string, testProjectPath: string): string {
         const sourceRoot = path.join(workspacePath, this.getSourceRoot());
         const relativeSourcePath = path.relative(sourceRoot, path.dirname(sourceFilePath));
         const sourceFileName = path.basename(sourceFilePath, this.options.fileExtension);
@@ -165,7 +165,7 @@ export class TestStructureAnalyzer {
         return results;
     }
 
-    private async findTestProjects(workspacePath: string): Promise<string[]> {
+    public async findTestProjects(workspacePath: string): Promise<string[]> {
         const projects: string[] = [];
         const entries = await fs.promises.readdir(workspacePath, { withFileTypes: true });
 
@@ -237,7 +237,6 @@ export class TestStructureAnalyzer {
 
     private async validateFileName(testFilePath: string): Promise<AnalysisError | null> {
         const fileName = path.basename(testFilePath);
-        const fileContent = await fs.promises.readFile(testFilePath, 'utf8');
         
         // Check if file ends with any of the configured test suffixes
         if (!this.isTestFile(fileName)) {
@@ -246,24 +245,6 @@ export class TestStructureAnalyzer {
                 type: AnalysisErrorType.InvalidFileName,
                 message: `File name must end with one of the configured test suffixes (${this.getTestFileSuffixes().join(', ')})`,
                 suggestion: fileName.replace(this.options.fileExtension, '') + defaultSuffix + this.options.fileExtension
-            };
-        }
-
-        // Find class name
-        const classMatch = fileContent.match(/public\s+class\s+(\w+)/);
-        if (!classMatch) {
-            return {
-                type: AnalysisErrorType.InvalidFileName,
-                message: 'Could not find class definition in test file'
-            };
-        }
-
-        const className = classMatch[1];
-        if (fileName !== className + this.options.fileExtension) {
-            return {
-                type: AnalysisErrorType.InvalidFileName,
-                message: `File name does not match class name. Expected: ${className}${this.options.fileExtension}, Found: ${fileName}`,
-                suggestion: `Rename file to ${className}${this.options.fileExtension}`
             };
         }
 
