@@ -273,6 +273,20 @@ async function createTestFile(sourceFile: string, workspacePath: string): Promis
 	vscode.window.showInformationMessage(`Created test file at: ${expectedTestPath}`);
 }
 
+async function ensureDirectoryExists(dirPath: string): Promise<void> {
+	const parts = dirPath.split(path.sep);
+	let currentPath = parts[0];
+
+	for (let i = 1; i < parts.length; i++) {
+		currentPath = path.join(currentPath, parts[i]);
+		try {
+			await vscode.workspace.fs.stat(vscode.Uri.file(currentPath));
+		} catch {
+			await vscode.workspace.fs.createDirectory(vscode.Uri.file(currentPath));
+		}
+	}
+}
+
 async function moveTestFile(testFilePath: string, sourceFile: string, workspacePath: string): Promise<void> {
 	const analyzer = new TestStructureAnalyzer();
 	const testProjects = await analyzer.findTestProjects(path.join(workspacePath, analyzer.getTestRoot()));
@@ -281,9 +295,10 @@ async function moveTestFile(testFilePath: string, sourceFile: string, workspaceP
 	}
 
 	const expectedTestPath = analyzer.getExpectedTestPath(sourceFile, workspacePath, testProjects[0]);
+	const targetDir = path.dirname(expectedTestPath);
 
-	// Create directory if it doesn't exist
-	await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(expectedTestPath)));
+	// Ensure directory exists, creating only missing parts
+	await ensureDirectoryExists(targetDir);
 
 	// Move the file
 	await vscode.workspace.fs.rename(
