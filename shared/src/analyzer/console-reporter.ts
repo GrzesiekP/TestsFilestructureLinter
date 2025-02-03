@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { AnalysisResult, AnalysisError, AnalysisErrorType } from './types';
+import { AnalysisResult, AnalysisErrorType } from './types';
 import * as path from 'path';
 
 export class ConsoleReporter {
@@ -54,7 +54,8 @@ export class ConsoleReporter {
     }
 
     private extractIncorrectSegment(message: string): string | null {
-        const match = message.match(/incorrect path segment: '([^']+)'/);
+        const regex = /incorrect path segment: '([^']+)'/;
+        const match = regex.exec(message);
         return match ? match[1] : null;
     }
 

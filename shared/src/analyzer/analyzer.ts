@@ -1,5 +1,3 @@
-import * as fs from 'fs/promises';
-import { existsSync } from 'fs';
 import * as path from 'path';
 import { glob } from 'glob';
 import { AnalysisResult, AnalysisError, AnalysisErrorType, AnalyzerOptions, DEFAULT_OPTIONS } from './types';
