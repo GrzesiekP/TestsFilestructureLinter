@@ -4,7 +4,7 @@ import * as path from 'path';
 import { glob } from 'glob';
 import { AnalysisResult, AnalysisError, AnalysisErrorType, AnalyzerOptions, DEFAULT_OPTIONS } from './types';
 
-export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Promise<AnalysisResult[]> {
+export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Promise<{ results: AnalysisResult[]; totalFiles: number }> {
     const mergedOptions: AnalyzerOptions = {
         ...DEFAULT_OPTIONS,
         ...options,
@@ -44,7 +44,10 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
         result.testRoot = mergedOptions.testRoot;
     });
     
-    return results;
+    return {
+        results,
+        totalFiles: testFiles.length + sourceFiles.length
+    };
 }
 
 async function findTestFiles(dir: string, extension: string, testFileSuffix: string): Promise<string[]> {

@@ -43,8 +43,8 @@ program
             };
             
             console.log(chalk.cyan('\nAnalyzing test structure...'));
-            const results = await analyzeProject(analyzerOptions);
-            reporter.reportResults(results);
+            const { results, totalFiles } = await analyzeProject(analyzerOptions);
+            reporter.reportResults(results, totalFiles);
             
             if (results.length > 0) {
                 process.exit(1);
