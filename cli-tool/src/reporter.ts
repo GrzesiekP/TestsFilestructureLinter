@@ -39,9 +39,6 @@ export class ConsoleReporter {
             console.log(chalk.cyan(`File: ${result.testFilePath}`));
             result.errors.forEach((error: AnalysisError) => {
                 console.log(chalk.red(`  ✖ ${error.message}`));
-                if (error.suggestion) {
-                    console.log(chalk.blue(`    ℹ Suggestion: ${error.suggestion}`));
-                }
             });
             console.log(''); // Add newline between files
         });

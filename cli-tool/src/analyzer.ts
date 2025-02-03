@@ -128,8 +128,7 @@ function validateFileName(testFilePath: string, options: AnalyzerOptions) {
     if (!hasValidSuffix) {
         return {
             type: AnalysisErrorType.InvalidFileName,
-            message: `File name must end with one of: ${options.testFileSuffixes.join(', ')}`,
-            suggestion: `Rename file to end with ${options.testFileSuffixes[0]}${options.fileExtension}`
+            message: `File name must end with one of: ${options.testFileSuffixes.join(', ')}`
         };
     }
 
@@ -177,8 +176,7 @@ async function validateDirectoryStructure(
     } catch {
         return {
             type: AnalysisErrorType.InvalidDirectoryStructure,
-            message: `Source file not found at expected location: ${expectedSourcePath}`,
-            suggestion: `Create source file at: ${expectedSourcePath}`
+            message: `Source file not found at expected location: ${expectedSourcePath}`
         };
     }
 }
@@ -219,8 +217,7 @@ async function analyzeMissingTests(
                 testFilePath: sourceFile,
                 errors: [{
                     type: AnalysisErrorType.MissingTest,
-                    message: `No test file found for: ${fileName}`,
-                    suggestion: `Create test file at: ${expectedTestPath}`
+                    message: `No test file found for: ${fileName}`
                 }]
             });
         }

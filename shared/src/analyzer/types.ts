@@ -7,7 +7,6 @@ export interface AnalysisResult {
 export interface AnalysisError {
     type: AnalysisErrorType;
     message: string;
-    suggestion?: string;
 }
 
 export enum AnalysisErrorType {
