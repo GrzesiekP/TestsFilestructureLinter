@@ -32,20 +32,21 @@ export class ConsoleReporter {
                         
                         if (incorrectSegment) {
                             const highlightedPath = this.highlightIncorrectSegment(actualRelative, incorrectSegment);
-                            console.log(chalk.gray(`  🔍 Current:  `) + highlightedPath);
-                            console.log(chalk.gray(`  🔍 Expected: ${expectedRelative}`));
+                            console.log(chalk.gray(`  🧪 Current:  `) + highlightedPath);
+                            console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
                         } else {
-                            console.log(chalk.gray(`  🔍 Current:  ${actualRelative}`));
-                            console.log(chalk.gray(`  🔍 Expected: ${expectedRelative}`));
+                            console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
+                            console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
                         }
                     }
                 } else if (error.type === AnalysisErrorType.MissingTest) {
                     const sourceFile = error.message.match(/source file: (.+)$/)?.[1];
                     if (sourceFile) {
                         const sourceRelative = this.getRelativePath(sourceFile, result.testRoot ? path.dirname(result.testRoot) : undefined);
-                        console.log(chalk.gray(`  📄 Missing test for source: ${sourceRelative}`));
+                        console.log(chalk.gray(`  📄 Source:   ${sourceRelative}`));
+                        console.log(chalk.gray(`  🧪 Missing test file`));
                     } else {
-                        console.log(chalk.gray(`  📄 ${error.message}`));
+                        console.log(chalk.gray(`  🧪 ${error.message}`));
                     }
                 }
             }

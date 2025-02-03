@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import * as path from 'path';
-import { createInterface } from 'readline';
+const { MultiSelect } = require('enquirer');
 import { 
     analyzeProject, 
     ConsoleReporter, 
@@ -30,7 +30,7 @@ program
     .option('--test-project-suffix <suffix>', 'Test project suffix', DEFAULT_OPTIONS.testProjectSuffix)
     .option('--fix-all', 'Fix all directory structure issues by moving files to their expected locations')
     .option('--fix <path>', 'Fix a specific test file')
-    .option('-i, --interactive', 'Interactive mode - select which file to fix')
+    .option('-i, --interactive', 'Interactive mode - select files to fix')
     .action(async (options) => {
         const reporter = new ConsoleReporter();
         
@@ -89,42 +89,57 @@ program
                         process.exit(1);
                     }
 
-                    console.log(chalk.cyan('\nFixable files:'));
-                    fixableFiles.forEach((file, index) => {
-                        console.log(chalk.gray(`  ${index + 1}. ${file.testFile}`));
+                    const prompt = new MultiSelect({
+                        name: 'files',
+                        message: chalk.cyan('Select files to fix'),
+                        hint: '(Use arrow keys and space to select, enter to confirm)',
+                        choices: fixableFiles.map(file => {
+                            const error = file.errors.find(e => e.type === AnalysisErrorType.InvalidDirectoryStructure);
+                            const currentPath = path.relative(testRoot, file.testFilePath);
+                            const targetPath = error?.expectedTestPath ? 
+                                path.relative(testRoot, error.expectedTestPath) :
+                                '';
+                            
+                            const pathDisplay = targetPath ? 
+                                `\n    ${chalk.yellow('📂')} Current:  ${chalk.gray(currentPath)}` +
+                                `\n    ${chalk.cyan('📂')} Expected: ${chalk.gray(targetPath)}` :
+                                chalk.gray(currentPath);
+
+                            return {
+                                name: file.testFilePath,
+                                value: file.testFilePath,
+                                message: `${chalk.white(file.testFile)}${pathDisplay}`
+                            };
+                        }),
+                        validate: (value: string[]) => value.length > 0 || 'Please select at least one file'
                     });
 
-                    const rl = createInterface({
-                        input: process.stdin,
-                        output: process.stdout
-                    });
-
-                    const answer = await new Promise<string>(resolve => {
-                        rl.question(chalk.cyan('\nEnter the number of the file to fix (or q to quit): '), resolve);
-                    });
-                    rl.close();
-
-                    if (answer.toLowerCase() === 'q') {
-                        process.exit(0);
-                    }
-
-                    const fileIndex = parseInt(answer) - 1;
-                    if (isNaN(fileIndex) || fileIndex < 0 || fileIndex >= fixableFiles.length) {
-                        console.error(chalk.red('\nError: Invalid selection'));
-                        process.exit(1);
-                    }
-
-                    const selectedFile = fixableFiles[fileIndex];
-                    const fixable = await isFixable(selectedFile.testFilePath, results);
+                    const selectedPaths = await prompt.run();
                     
-                    if (fixable.isFixable && fixable.fix) {
-                        console.log(chalk.cyan('\nFixing file...'));
-                        const result = await fixable.fix();
-                        console.log(chalk.green(`\n✓ Fixed file:`));
-                        console.log(chalk.gray(`  Moved: ${result.from} → ${result.to}`));
-                    } else {
-                        console.error(chalk.red(`\nError: ${fixable.error}`));
+                    if (!selectedPaths || selectedPaths.length === 0) {
+                        console.error(chalk.red('\nError: No files selected'));
                         process.exit(1);
+                    }
+
+                    console.log(chalk.cyan('\nFixing selected files...'));
+                    let fixedCount = 0;
+                    
+                    for (const testPath of selectedPaths) {
+                        const fixable = await isFixable(testPath, results);
+                        if (fixable.isFixable && fixable.fix) {
+                            try {
+                                const result = await fixable.fix();
+                                console.log(chalk.green(`✓ Fixed: ${path.basename(result.from)}`));
+                                console.log(chalk.gray(`  Moved: ${result.from} → ${result.to}`));
+                                fixedCount++;
+                            } catch (err) {
+                                console.error(chalk.red(`✗ Failed to fix ${path.basename(testPath)}: ${err instanceof Error ? err.message : 'Unknown error'}`));
+                            }
+                        }
+                    }
+                    
+                    if (fixedCount > 0) {
+                        console.log(chalk.green(`\n✓ Fixed ${fixedCount} files`));
                     }
                 } else if (options.fixAll) {
                     console.log(chalk.cyan('\nFixing directory structure issues...'));
