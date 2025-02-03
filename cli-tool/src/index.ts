@@ -18,6 +18,7 @@ program
     .option('--no-validate-directory', 'Disable directory structure validation')
     .option('--no-validate-missing', 'Disable missing tests validation')
     .option('--test-suffix <suffix>', 'Test file suffix', DEFAULT_OPTIONS.testFileSuffix)
+    .option('--test-project-suffix <suffix>', 'Test project suffix', DEFAULT_OPTIONS.testProjectSuffix)
     .action(async (options) => {
         const reporter = new ConsoleReporter();
         
@@ -37,7 +38,8 @@ program
                 validateFileName: options.validateFilename !== false,
                 validateDirectoryStructure: options.validateDirectory !== false,
                 validateMissingTests: options.validateMissing !== false,
-                testFileSuffix: options.testSuffix
+                testFileSuffix: options.testSuffix,
+                testProjectSuffix: options.testProjectSuffix
             };
             
             console.log(chalk.cyan('\nAnalyzing test structure...'));

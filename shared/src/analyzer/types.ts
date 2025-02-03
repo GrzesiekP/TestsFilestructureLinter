@@ -1,19 +1,22 @@
 export interface AnalysisResult {
     testFile: string;
     testFilePath: string;
+    testRoot?: string;
     errors: AnalysisError[];
 }
 
 export interface AnalysisError {
     type: AnalysisErrorType;
     message: string;
-    suggestion?: string;
+    sourceFilePath?: string;
+    actualTestPath?: string;
+    expectedTestPath?: string;
 }
 
 export enum AnalysisErrorType {
-    InvalidFileName = 'InvalidFileName',
-    InvalidDirectoryStructure = 'InvalidDirectoryStructure',
-    MissingTest = 'MissingTest'
+    InvalidFileName = 'Invalid File Name',
+    InvalidDirectoryStructure = 'Invalid Directory Structure',
+    MissingTest = 'Missing Test File'
 }
 
 export interface AnalyzerOptions {
@@ -24,6 +27,7 @@ export interface AnalyzerOptions {
     validateDirectoryStructure: boolean;
     validateMissingTests: boolean;
     testFileSuffix: string;
+    testProjectSuffix: string;
 }
 
 export const DEFAULT_OPTIONS: AnalyzerOptions = {
@@ -33,5 +37,6 @@ export const DEFAULT_OPTIONS: AnalyzerOptions = {
     validateFileName: true,
     validateDirectoryStructure: true,
     validateMissingTests: true,
-    testFileSuffix: 'Tests'
+    testFileSuffix: 'Tests',
+    testProjectSuffix: '.Tests'
 }; 

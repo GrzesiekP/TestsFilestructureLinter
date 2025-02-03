@@ -8,38 +8,54 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
     const mergedOptions: AnalyzerOptions = {
         ...DEFAULT_OPTIONS,
         ...options,
-        // Ensure paths are absolute
         srcRoot: path.resolve(options.srcRoot || DEFAULT_OPTIONS.srcRoot),
         testRoot: path.resolve(options.testRoot || DEFAULT_OPTIONS.testRoot)
     };
     const results: AnalysisResult[] = [];
     
-    const testFiles = await findTestFiles(mergedOptions.testRoot, mergedOptions.fileExtension);
+    const testFiles = await findTestFiles(
+        mergedOptions.testRoot,
+        mergedOptions.fileExtension,
+        mergedOptions.testFileSuffix
+    );
     const sourceFiles = await findSourceFiles(mergedOptions.srcRoot, mergedOptions.fileExtension);
     
+    // Create a map of source file names to their full paths for quick lookup
+    const sourceFileMap = new Map<string, string>();
+    for (const sourceFile of sourceFiles) {
+        const baseName = path.basename(sourceFile, path.extname(sourceFile));
+        sourceFileMap.set(baseName, sourceFile);
+    }
+    
     for (const testFile of testFiles) {
-        const result = await analyzeTestFile(path.resolve(testFile), mergedOptions);
+        const result = await analyzeTestFile(path.resolve(testFile), mergedOptions, sourceFileMap);
         if (result.errors.length > 0) {
             results.push(result);
         }
     }
     
     if (mergedOptions.validateMissingTests) {
-        const missingTestResults = await analyzeMissingTests(
-            sourceFiles.map(f => path.resolve(f)),
-            testFiles.map(f => path.resolve(f)),
-            mergedOptions
-        );
+        const missingTestResults = await analyzeMissingTests(sourceFiles, testFiles, mergedOptions);
         results.push(...missingTestResults);
     }
+    
+    // Add test root to each result for reporting
+    results.forEach(result => {
+        result.testRoot = mergedOptions.testRoot;
+    });
     
     return results;
 }
 
-async function findTestFiles(dir: string, extension: string): Promise<string[]> {
+async function findTestFiles(dir: string, extension: string, testFileSuffix: string): Promise<string[]> {
     try {
         const files = await glob(`${dir}/**/*${extension}`);
-        return files.map(f => path.resolve(f));
+        return files
+            .map(f => path.resolve(f))
+            .filter(f => {
+                const fileName = path.basename(f, path.extname(f));
+                return fileName.endsWith(testFileSuffix);
+            });
     } catch (error) {
         console.error('Error finding test files:', error);
         return [];
@@ -56,7 +72,11 @@ async function findSourceFiles(dir: string, extension: string): Promise<string[]
     }
 }
 
-async function analyzeTestFile(testFilePath: string, options: AnalyzerOptions): Promise<AnalysisResult> {
+async function analyzeTestFile(
+    testFilePath: string,
+    options: AnalyzerOptions,
+    sourceFileMap: Map<string, string>
+): Promise<AnalysisResult> {
     const result: AnalysisResult = {
         testFile: path.basename(testFilePath),
         testFilePath: path.resolve(testFilePath),
@@ -71,7 +91,7 @@ async function analyzeTestFile(testFilePath: string, options: AnalyzerOptions): 
     }
     
     if (options.validateDirectoryStructure) {
-        const structureError = validateDirectoryStructure(testFilePath, options);
+        const structureError = validateDirectoryStructure(testFilePath, options, sourceFileMap);
         if (structureError) {
             result.errors.push(structureError);
         }
@@ -91,37 +111,128 @@ function validateFileName(filePath: string, suffix: string): AnalysisError | nul
     return null;
 }
 
-function validateDirectoryStructure(testFilePath: string, options: AnalyzerOptions): AnalysisError | null {
-    const testDir = path.dirname(testFilePath);
-    const relativePath = path.relative(options.testRoot, testDir);
-    const expectedSourceDir = path.join(options.srcRoot, relativePath);
-    
-    try {
-        if (!existsSync(expectedSourceDir)) {
+function validateDirectoryStructure(
+    testFilePath: string,
+    options: AnalyzerOptions,
+    sourceFileMap: Map<string, string>
+): AnalysisError | null {
+    const testFileName = path.basename(testFilePath, path.extname(testFilePath));
+    const sourceFileName = testFileName.replace(new RegExp(`${options.testFileSuffix}$`), '');
+    const sourceFilePath = sourceFileMap.get(sourceFileName);
+
+    if (!sourceFilePath) {
+        // Try to find source file with similar name in any directory
+        const potentialSourceFiles = Array.from(sourceFileMap.entries())
+            .filter(([name]) => name.toLowerCase() === sourceFileName.toLowerCase());
+
+        if (potentialSourceFiles.length > 0) {
+            const [, foundSourcePath] = potentialSourceFiles[0];
+            const expectedTestPath = calculateExpectedTestPath(foundSourcePath, options);
+            const firstIncorrectSegment = findFirstIncorrectSegment(testFilePath, expectedTestPath, options);
+
             return {
                 type: AnalysisErrorType.InvalidDirectoryStructure,
-                message: `Test file directory structure does not match source directory structure at: ${path.resolve(testFilePath)}`
+                message: firstIncorrectSegment ? 
+                    `Test file has incorrect path segment: '${firstIncorrectSegment}'` :
+                    'Test file is in wrong directory',
+                sourceFilePath: foundSourcePath,
+                actualTestPath: testFilePath,
+                expectedTestPath: expectedTestPath
             };
         }
-    } catch (error) {
-        console.error('Error validating directory structure:', error);
+
+        return {
+            type: AnalysisErrorType.InvalidDirectoryStructure,
+            message: `Source file not found`
+        };
+    }
+
+    // Get the relative paths from their respective roots
+    const expectedTestPath = calculateExpectedTestPath(sourceFilePath, options);
+    const firstIncorrectSegment = findFirstIncorrectSegment(testFilePath, expectedTestPath, options);
+
+    if (firstIncorrectSegment || path.normalize(testFilePath) !== path.normalize(expectedTestPath)) {
+        return {
+            type: AnalysisErrorType.InvalidDirectoryStructure,
+            message: firstIncorrectSegment ? 
+                `Test file has incorrect path segment: '${firstIncorrectSegment}'` :
+                'Test file is in wrong directory',
+            sourceFilePath: sourceFilePath,
+            actualTestPath: testFilePath,
+            expectedTestPath: expectedTestPath
+        };
+    }
+
+    return null;
+}
+
+function findFirstIncorrectSegment(actualPath: string, expectedPath: string, options: AnalyzerOptions): string | null {
+    const actualRelative = path.relative(options.testRoot, actualPath);
+    const expectedRelative = path.relative(options.testRoot, expectedPath);
+    
+    const actualSegments = actualRelative.split(/[\\/]/).filter(s => s !== '');
+    const expectedSegments = expectedRelative.split(/[\\/]/).filter(s => s !== '');
+    
+    // Compare each segment
+    for (let i = 0; i < Math.min(actualSegments.length, expectedSegments.length); i++) {
+        if (actualSegments[i] !== expectedSegments[i]) {
+            // If this is an extra directory segment that shouldn't be there
+            if (!expectedSegments.includes(actualSegments[i])) {
+                return actualSegments[i];
+            }
+        }
+    }
+    
+    // If we get here and lengths are different, the last segment of the longer path is incorrect
+    if (actualSegments.length > expectedSegments.length) {
+        return actualSegments[expectedSegments.length];
     }
     
     return null;
 }
 
+function calculateExpectedTestPath(sourceFilePath: string, options: AnalyzerOptions): string {
+    const relativeSourcePath = path.relative(options.srcRoot, path.dirname(sourceFilePath));
+    const sourceSegments = relativeSourcePath.split(path.sep);
+    const testSegments = [...sourceSegments];
+
+    // Add the test project suffix to the first directory
+    if (testSegments.length > 0) {
+        testSegments[0] = testSegments[0] + options.testProjectSuffix;
+    }
+
+    const sourceFileName = path.basename(sourceFilePath);
+    const testFileName = sourceFileName.replace(path.extname(sourceFileName), '') + 
+        options.testFileSuffix + path.extname(sourceFileName);
+
+    return path.join(
+        options.testRoot,
+        ...testSegments,
+        testFileName
+    );
+}
+
 async function analyzeMissingTests(sourceFiles: string[], testFiles: string[], options: AnalyzerOptions): Promise<AnalysisResult[]> {
     const results: AnalysisResult[] = [];
+    const testFileMap = new Map<string, string>();
+
+    // Create a map of test base names (without suffix) to their full paths
+    for (const testFile of testFiles) {
+        const baseName = path.basename(testFile, path.extname(testFile))
+            .replace(new RegExp(`${options.testFileSuffix}$`), '');
+        testFileMap.set(baseName, testFile);
+    }
     
     for (const sourceFile of sourceFiles) {
-        const expectedTestFile = sourceFile
-            .replace(options.srcRoot, options.testRoot)
-            .replace(path.extname(sourceFile), `${options.testFileSuffix}${path.extname(sourceFile)}`);
-            
-        if (!testFiles.includes(expectedTestFile)) {
+        const sourceBaseName = path.basename(sourceFile, path.extname(sourceFile));
+        const expectedTestFile = testFileMap.get(sourceBaseName);
+
+        if (!expectedTestFile) {
+            const expectedTestPath = calculateExpectedTestPath(sourceFile, options);
+
             results.push({
-                testFile: path.basename(expectedTestFile),
-                testFilePath: path.resolve(expectedTestFile),
+                testFile: path.basename(expectedTestPath),
+                testFilePath: path.resolve(expectedTestPath),
                 errors: [{
                     type: AnalysisErrorType.MissingTest,
                     message: `Missing test file for source file: ${path.resolve(sourceFile)}`
