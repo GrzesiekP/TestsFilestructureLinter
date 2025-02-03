@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { TestStructureAnalyzer } from './analyzer/testStructureAnalyzer';
-import { AnalysisResult, AnalysisErrorType } from './analyzer/types';
+import { AnalysisResult, AnalysisErrorType, AnalysisError } from './analyzer/types';
 import * as path from 'path';
 
 let outputChannel: vscode.OutputChannel;
@@ -32,10 +32,8 @@ export function activate(context: vscode.ExtensionContext) {
 				// Handle webview messages
 				webviewView.webview.onDidReceiveMessage(
 					async message => {
-						switch (message.command) {
-							case 'analyze':
-								await vscode.commands.executeCommand('test-filestructure-linter.analyze');
-								return;
+						if (message.command == 'analyze') {
+							await vscode.commands.executeCommand('test-filestructure-linter.analyze');
 						}
 					},
 					undefined,
@@ -275,6 +273,53 @@ async function createTestFile(sourceFile: string, workspacePath: string): Promis
 	vscode.window.showInformationMessage(`Created test file at: ${expectedTestPath}`);
 }
 
+async function ensureDirectoryExists(dirPath: string): Promise<void> {
+	const parts = dirPath.split(path.sep);
+	let currentPath = parts[0];
+
+	for (let i = 1; i < parts.length; i++) {
+		currentPath = path.join(currentPath, parts[i]);
+		try {
+			await vscode.workspace.fs.stat(vscode.Uri.file(currentPath));
+		} catch {
+			await vscode.workspace.fs.createDirectory(vscode.Uri.file(currentPath));
+		}
+	}
+}
+
+async function updateNamespace(filePath: string, sourceFile: string, workspacePath: string, testProjectPath: string): Promise<void> {
+	const fileContent = (await vscode.workspace.fs.readFile(vscode.Uri.file(filePath))).toString();
+	const lines = fileContent.split('\n');
+	
+	// Find namespace line
+	const namespaceLineIndex = lines.findIndex(line => line.trim().startsWith('namespace'));
+	if (namespaceLineIndex === -1) return;
+
+	// Get source project and relative path
+	const sourceRoot = path.join(workspacePath, 'src');
+	const relativeSourcePath = path.relative(sourceRoot, path.dirname(sourceFile));
+	const pathParts = relativeSourcePath.split(path.sep);
+	const sourceProjectName = pathParts[0];
+	const remainingPath = pathParts.slice(1).join('.');
+
+	// Construct new namespace
+	const testProjectName = sourceProjectName + '.Tests';
+	const newNamespace = remainingPath 
+		? `${testProjectName}.${remainingPath}` 
+		: testProjectName;
+
+	// Replace old namespace with new one
+	const oldLine = lines[namespaceLineIndex];
+	const indentation = oldLine.match(/^\s*/)?.[0] || '';
+	lines[namespaceLineIndex] = `${indentation}namespace ${newNamespace};`;
+
+	// Write updated content back to file
+	await vscode.workspace.fs.writeFile(
+		vscode.Uri.file(filePath),
+		Buffer.from(lines.join('\n'), 'utf8')
+	);
+}
+
 async function moveTestFile(testFilePath: string, sourceFile: string, workspacePath: string): Promise<void> {
 	const analyzer = new TestStructureAnalyzer();
 	const testProjects = await analyzer.findTestProjects(path.join(workspacePath, analyzer.getTestRoot()));
@@ -283,9 +328,10 @@ async function moveTestFile(testFilePath: string, sourceFile: string, workspaceP
 	}
 
 	const expectedTestPath = analyzer.getExpectedTestPath(sourceFile, workspacePath, testProjects[0]);
+	const targetDir = path.dirname(expectedTestPath);
 
-	// Create directory if it doesn't exist
-	await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(expectedTestPath)));
+	// Ensure directory exists, creating only missing parts
+	await ensureDirectoryExists(targetDir);
 
 	// Move the file
 	await vscode.workspace.fs.rename(
@@ -293,6 +339,9 @@ async function moveTestFile(testFilePath: string, sourceFile: string, workspaceP
 		vscode.Uri.file(expectedTestPath),
 		{ overwrite: false }
 	);
+
+	// Update namespace in the moved file
+	await updateNamespace(expectedTestPath, sourceFile, workspacePath, testProjects[0]);
 
 	vscode.window.showInformationMessage(`Successfully moved test file to: ${expectedTestPath}`);
 }
@@ -368,6 +417,74 @@ function getFixButtonTooltip(isMissingTest: boolean, results: AnalysisResult[], 
 	return hasMisplacedTest 
 		? 'Move existing test file to the correct location' 
 		: 'Create a new test file in the correct location';
+}
+
+function generateFileHtml(result: AnalysisResult, experimentalFixesEnabled: boolean, results: AnalysisResult[]): string {
+	const fileName = path.basename(result.testFilePath);
+	const isFixable = result.errors.some(error => 
+		error.type === AnalysisErrorType.InvalidDirectoryStructure && 
+		error.message.includes('Test file in invalid directory')
+	);
+	const isMissingTest = result.errors.some(error => 
+		error.type === AnalysisErrorType.MissingTest
+	);
+
+	const tooltip = getFixButtonTooltip(isMissingTest, results, result.testFilePath);
+	const errorType = isMissingTest ? AnalysisErrorType.MissingTest : AnalysisErrorType.InvalidDirectoryStructure;
+
+	return `
+		<div class="file-container">
+			<div class="file-header" onclick="toggleContent(this)">
+				<div class="file-header-content">
+					${fileName}
+				</div>
+				${(isFixable || isMissingTest) && experimentalFixesEnabled ? 
+					`<button class="fix-button" 
+						data-error-type="${errorType}" 
+						data-file-path="${result.testFilePath}"
+						title="${tooltip}">
+						<span class="button-text">Fix</span>
+						<div class="fix-spinner"></div>
+					</button>` : 
+					''}
+			</div>
+			<div class="file-content">
+				<a class="file-path" data-path="${result.testFilePath}">${result.testFilePath}</a>
+				${result.errors.map(error => `
+					<div class="error">
+						<span class="error-icon">⚠</span>
+						<div class="error-message">${error.message}</div>
+					</div>`).join('')}
+			</div>
+		</div>`;
+}
+
+function setupMessageHandler(webview: vscode.WebviewView, context: vscode.ExtensionContext) {
+	webview.webview.onDidReceiveMessage(
+		async message => {
+			switch (message.command) {
+				case 'openFile':
+					vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.filePath));
+					return;
+				case 'fix':
+					await handleFixAction(message.filePath, message.errorType);
+					return;
+				case 'fixAll':
+					await handleFixAllAction(message.filePaths, context);
+					return;
+				case 'analyze':
+					await vscode.commands.executeCommand('test-filestructure-linter.analyze');
+					return;
+			}
+		},
+		undefined,
+		context.subscriptions
+	);
+}
+
+function generateSummaryText(results: AnalysisResult[], hasFixableIssues: () => boolean, countFixableFiles: (results: AnalysisResult[]) => number): string {
+	const fixableText = hasFixableIssues() ? ` (${countFixableFiles(results)} fixable)` : '';
+	return `<div class="summary-text">Issues found in ${results.length} files${fixableText}</div>`;
 }
 
 function updateWebview(results: AnalysisResult[], context: vscode.ExtensionContext) {
@@ -575,10 +692,35 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					height: 22px;
 					line-height: 14px;
 					font-family: var(--vscode-font-family);
+					position: relative;
+					min-width: 40px;
 				}
-				.fix-button:hover {
+				.fix-button:disabled {
+					opacity: 0.5;
+					cursor: not-allowed;
+				}
+				.fix-button:hover:not(:disabled) {
 					background-color: var(--vscode-button-secondaryHoverBackground);
 					color: var(--vscode-button-secondaryForeground);
+				}
+				.fix-button.fixing {
+					padding-right: 24px;
+				}
+				.fix-button .fix-spinner {
+					display: none;
+					width: 12px;
+					height: 12px;
+					border: 2px solid var(--vscode-button-secondaryForeground);
+					border-radius: 50%;
+					border-top-color: transparent;
+					animation: spin 1s linear infinite;
+					position: absolute;
+					right: 6px;
+					top: 50%;
+					transform: translateY(-50%);
+				}
+				.fix-button.fixing .fix-spinner {
+					display: block;
 				}
 				.arrow {
 					display: inline-flex;
@@ -611,10 +753,35 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					line-height: 14px;
 					font-family: var(--vscode-font-family);
 					align-self: flex-start;
+					position: relative;
+					min-width: 60px;
 				}
-				.fix-all-button:hover {
+				.fix-all-button:disabled {
+					opacity: 0.5;
+					cursor: not-allowed;
+				}
+				.fix-all-button:hover:not(:disabled) {
 					background-color: var(--vscode-button-secondaryHoverBackground);
 					color: var(--vscode-button-secondaryForeground);
+				}
+				.fix-all-button.fixing {
+					padding-right: 24px;
+				}
+				.fix-all-button .fix-spinner {
+					display: none;
+					width: 12px;
+					height: 12px;
+					border: 2px solid var(--vscode-button-secondaryForeground);
+					border-radius: 50%;
+					border-top-color: transparent;
+					animation: spin 1s linear infinite;
+					position: absolute;
+					right: 6px;
+					top: 50%;
+					transform: translateY(-50%);
+				}
+				.fix-all-button.fixing .fix-spinner {
+					display: block;
 				}
 			</style>
 		</head>
@@ -628,57 +795,20 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 					<div class="summary-stats">
 						<div class="summary-text">Files analyzed: ${totalFilesAnalyzed}</div>
 						<div class="summary-text">Last analyzed at: ${lastAnalyzedTime}</div>
-						${hasIssues ? `<div class="summary-text">Issues found in ${results.length} files${hasFixableIssues() ? ` (${countFixableFiles(results)} fixable)` : ''}</div>` : ''}
+						${hasIssues ? generateSummaryText(results, hasFixableIssues, countFixableFiles) : ''}
 					</div>
 					${hasFixableIssues() ? 
 						`<button class="fix-all-button" title="Fix all issues by creating missing test files and moving misplaced test files to their correct locations">
-							Fix All
+							<span class="button-text">Fix All</span>
+							<div class="fix-spinner"></div>
 						</button>` : ''}
 				</div>
 			</div>
 			<div class="tree">`;
 
-	if (results.length > 0) {
-		for (const result of results) {
-			const fileName = path.basename(result.testFilePath);
-			const isFixable = result.errors.some(error => 
-				error.type === AnalysisErrorType.InvalidDirectoryStructure && 
-				error.message.includes('Test file in invalid directory')
-			);
-			const isMissingTest = result.errors.some(error => 
-				error.type === AnalysisErrorType.MissingTest
-			);
-
-			const tooltip = getFixButtonTooltip(isMissingTest, results, result.testFilePath);
-
-			html += `
-				<div class="file-container">
-					<div class="file-header" onclick="toggleContent(this)">
-						<div class="file-header-content">
-							${fileName}
-						</div>
-						${(isFixable || isMissingTest) && experimentalFixesEnabled ? 
-							`<button class="fix-button" 
-								data-error-type="${isMissingTest ? AnalysisErrorType.MissingTest : AnalysisErrorType.InvalidDirectoryStructure}" 
-								data-file-path="${result.testFilePath}"
-								title="${tooltip}">
-								Fix
-							</button>` : 
-							''}
-					</div>
-					<div class="file-content">
-						<a class="file-path" data-path="${result.testFilePath}">${result.testFilePath}</a>
-						${result.errors.map(error => `
-							<div class="error">
-								<span class="error-icon">⚠</span>
-								<div class="error-message">${error.message}</div>
-							</div>`).join('')}
-					</div>
-				</div>`;
-		}
-	} else {
-		html += '<div class="no-issues">No issues found.</div>';
-	}
+	html += results.length > 0 
+		? results.map(result => generateFileHtml(result, experimentalFixesEnabled, results)).join('')
+		: '<div class="no-issues">No issues found.</div>';
 
 	html += `</div>
 		<script>
@@ -719,16 +849,34 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 						command: 'openFile',
 						filePath: e.target.dataset.path
 					});
-				} else if (e.target.classList.contains('fix-button')) {
+				} else if (e.target.closest('.fix-button')) {
 					e.preventDefault();
-					const button = e.target;
+					const button = e.target.closest('.fix-button');
+					if (button.disabled) return;
+					
+					button.disabled = true;
+					button.classList.add('fixing');
+					
 					vscode.postMessage({
 						command: 'fix',
 						errorType: button.dataset.errorType,
 						filePath: button.dataset.filePath
 					});
-				} else if (e.target.classList.contains('fix-all-button')) {
+				} else if (e.target.closest('.fix-all-button')) {
 					e.preventDefault();
+					const button = e.target.closest('.fix-all-button');
+					if (button.disabled) return;
+
+					// Disable Fix All button and show loading state
+					button.disabled = true;
+					button.classList.add('fixing');
+					button.querySelector('.button-text').textContent = 'Fixing...';
+
+					// Disable all individual Fix buttons
+					document.querySelectorAll('.fix-button').forEach(btn => {
+						btn.disabled = true;
+					});
+					
 					vscode.postMessage({
 						command: 'fixAll'
 					});
@@ -739,51 +887,43 @@ function updateWebview(results: AnalysisResult[], context: vscode.ExtensionConte
 		</html>`;
 
 	currentWebview.webview.html = html;
-
-	// Update the message handler
-	currentWebview.webview.onDidReceiveMessage(
-		async message => {
-			switch (message.command) {
-				case 'openFile':
-					vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.filePath));
-					return;
-				case 'fix':
-					await handleFixAction(message.filePath, message.errorType);
-					return;
-				case 'fixAll':
-					await handleFixAllAction(message.filePaths, context);
-					return;
-				case 'analyze':
-					await vscode.commands.executeCommand('test-filestructure-linter.analyze');
-					return;
-			}
-		},
-		undefined,
-		context.subscriptions
-	);
+	setupMessageHandler(currentWebview, context);
 }
 
-function updateDiagnostics(results: AnalysisResult[]) {
+function findLineNumber(lines: string[], error: AnalysisError): number {
+	const searchPattern = error.type === AnalysisErrorType.InvalidDirectoryStructure ? 
+		'namespace' : 'public class';
+	
+	return lines.findIndex(line => line.trim().startsWith(searchPattern)) || 0;
+}
+
+function createDiagnostic(message: string, lineNumber: number, lineLength: number = 0): vscode.Diagnostic {
+	const range = new vscode.Range(lineNumber, 0, lineNumber, lineLength);
+	const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
+	diagnostic.source = 'Test Structure Analyzer';
+	return diagnostic;
+}
+
+async function updateDiagnostics(results: AnalysisResult[]) {
+	const config = vscode.workspace.getConfiguration('testFilestructureLinter');
+	const showDiagnostics = config.get<boolean>('showDiagnosticErrors') ?? false;
+
 	diagnosticCollection.clear();
+	if (!showDiagnostics) return;
 
 	for (const result of results) {
-		const diagnostics: vscode.Diagnostic[] = result.errors.map(error => {
-			const diagnostic = new vscode.Diagnostic(
-				new vscode.Range(0, 0, 0, 0),
-				error.message,
-				vscode.DiagnosticSeverity.Error
-			);
-			diagnostic.source = 'Test Structure Analyzer';
-			if (error.suggestion) {
-				diagnostic.relatedInformation = [
-					new vscode.DiagnosticRelatedInformation(
-						new vscode.Location(vscode.Uri.file(result.testFilePath), new vscode.Position(0, 0)),
-						error.suggestion
-					)
-				];
+		const diagnostics: vscode.Diagnostic[] = [];
+		
+		for (const error of result.errors) {
+			try {
+				const content = (await vscode.workspace.fs.readFile(vscode.Uri.file(result.testFilePath))).toString();
+				const lines = content.split('\n');
+				const lineNumber = findLineNumber(lines, error);
+				diagnostics.push(createDiagnostic(error.message, lineNumber, lines[lineNumber]?.length));
+			} catch {
+				diagnostics.push(createDiagnostic(error.message, 0));
 			}
-			return diagnostic;
-		});
+		}
 
 		diagnosticCollection.set(vscode.Uri.file(result.testFilePath), diagnostics);
 	}

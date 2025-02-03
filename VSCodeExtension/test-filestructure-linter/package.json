@@ -14,7 +14,7 @@
     "url": "https://github.com/GrzesiekP/TestsFilestructureLinter"
   },
   "engines": {
-    "vscode": "^1.96.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Linters",
@@ -46,6 +46,14 @@
           "default": ["bin", "obj"],
           "description": "Directories to ignore during analysis"
         },
+        "testFilestructureLinter.excludedTestFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of test file names to exclude from analysis (e.g. ['AutoMapperTests']). Case insensitive."
+        },
         "testFilestructureLinter.enableExperimentalFixes": {
           "type": "boolean",
           "default": false,
@@ -55,6 +63,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable validation to check if source files have corresponding test files"
+        },
+        "testFilestructureLinter.showDiagnosticErrors": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show diagnostic errors in the editor when opening files"
         },
         "testFilestructureLinter.testFileSuffixes": {
           "type": "array",
@@ -110,23 +123,27 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test",
-    "analyze": "node ./out/cli.js"
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/vscode": "^1.96.0",
-    "@types/mocha": "^10.0.10",
+    "@types/vscode": "^1.85.0",
+    "@types/glob": "^7.2.0",
+    "@types/mocha": "^10.0.6",
     "@types/node": "20.x",
-    "@typescript-eslint/eslint-plugin": "^8.17.0",
-    "@typescript-eslint/parser": "^8.17.0",
-    "eslint": "^9.16.0",
-    "typescript": "^5.7.2",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1"
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "glob": "^7.2.3",
+    "minimatch": "^3.1.2",
+    "mocha": "^10.2.0",
+    "typescript": "^5.3.3",
+    "@vscode/test-electron": "^2.3.8"
+  },
+  "overrides": {
+    "minimatch": "^3.1.2",
+    "glob": "^7.2.3"
   }
 }

@@ -15,6 +15,11 @@ export class TestStructureAnalyzer {
         return config.get<string[]>('ignoredDirectories') ?? ['bin', 'obj'];
     }
 
+    private getExcludedTestFiles(): string[] {
+        const config = vscode.workspace.getConfiguration('testFilestructureLinter');
+        return config.get<string[]>('excludedTestFiles') ?? [];
+    }
+
     private getTestFileSuffixes(): string[] {
         const config = vscode.workspace.getConfiguration('testFilestructureLinter');
         return config.get<string[]>('testFileSuffixes') ?? ['Tests'];
@@ -47,6 +52,14 @@ export class TestStructureAnalyzer {
 
     private isIgnoredDirectory(dirName: string): boolean {
         return this.getIgnoredDirectories().includes(dirName);
+    }
+
+    private isExcludedTestFile(fileName: string): boolean {
+        const excludedFiles = this.getExcludedTestFiles();
+        const fileNameWithoutExtension = path.basename(fileName, this.options.fileExtension);
+        return excludedFiles.some(excluded => 
+            fileNameWithoutExtension.toLowerCase() === excluded.toLowerCase()
+        );
     }
 
     private isTestFile(fileName: string): boolean {
@@ -200,7 +213,8 @@ export class TestStructureAnalyzer {
                 testFiles.push(...subFiles);
             } else if (entry.isFile() && 
                       entry.name.endsWith(this.options.fileExtension) && 
-                      this.isTestFile(entry.name)) {
+                      this.isTestFile(entry.name) &&
+                      !this.isExcludedTestFile(entry.name)) {
                 testFiles.push(fullPath);
             }
         }
@@ -334,7 +348,13 @@ export class TestStructureAnalyzer {
         for (const sourceFile of sourceFiles) {
             const sourceFileName = path.basename(sourceFile);
             const className = sourceFileName.replace(this.options.fileExtension, '');
+            const expectedTestFileName = className + this.getTestFileSuffixes()[0] + this.options.fileExtension;
             
+            // Skip if the expected test file would be excluded
+            if (this.isExcludedTestFile(expectedTestFileName)) {
+                continue;
+            }
+
             // Check each test project
             let testFileFound = false;
             let wrongLocationTestFile = existingResults.find(r => 
