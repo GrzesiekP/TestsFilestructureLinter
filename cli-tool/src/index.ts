@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import * as path from 'path';
-import { analyzeProject, ConsoleReporter, AnalyzerOptions, DEFAULT_OPTIONS } from '@test-filestructure-linter/shared';
+import { analyzeProject, ConsoleReporter, AnalyzerOptions, DEFAULT_OPTIONS, fixDirectoryStructure } from '@test-filestructure-linter/shared';
 
 const program = new Command();
 
@@ -19,6 +19,7 @@ program
     .option('--no-validate-missing', 'Disable missing tests validation')
     .option('--test-suffix <suffix>', 'Test file suffix', DEFAULT_OPTIONS.testFileSuffix)
     .option('--test-project-suffix <suffix>', 'Test project suffix', DEFAULT_OPTIONS.testProjectSuffix)
+    .option('--fix-all', 'Fix all directory structure issues by moving files to their expected locations')
     .action(async (options) => {
         const reporter = new ConsoleReporter();
         
@@ -44,9 +45,20 @@ program
             
             console.log(chalk.cyan('\nAnalyzing test structure...'));
             const { results, totalFiles } = await analyzeProject(analyzerOptions);
-            reporter.reportResults(results, totalFiles);
+            reporter.reportResults(results);
             
-            if (results.length > 0) {
+            if (results.length > 0 && options.fixAll) {
+                console.log(chalk.cyan('\nFixing directory structure issues...'));
+                const fixedFiles = await fixDirectoryStructure(results, analyzerOptions);
+                if (fixedFiles.length > 0) {
+                    console.log(chalk.green(`\n✓ Fixed ${fixedFiles.length} files:`));
+                    for (const { from, to } of fixedFiles) {
+                        console.log(chalk.gray(`  Moved: ${from} → ${to}`));
+                    }
+                }
+            }
+            
+            if (results.length > 0 && !options.fixAll) {
                 process.exit(1);
             }
         } catch (error) {

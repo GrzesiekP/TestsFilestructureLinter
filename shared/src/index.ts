@@ -1,4 +1,4 @@
 export * from './analyzer/types';
-export { ConsoleReporter } from './analyzer/ConsoleReporter';
-export * from './analyzer/analyzer';
-export * from './analyzer/fixer'; 
+export { ConsoleReporter } from './analyzer/console-reporter';
+export { analyzeProject } from './analyzer/analyzer';
+export { fixDirectoryStructure } from './analyzer/fixer'; 
