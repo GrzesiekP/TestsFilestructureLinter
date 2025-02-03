@@ -53,6 +53,47 @@ interface FixResult {
     to: string;
 }
 
+export interface FixableResult {
+    isFixable: boolean;
+    error?: string;
+    fix?: () => Promise<FixResult>;
+}
+
+export async function isFixable(testFilePath: string, results: AnalysisResult[]): Promise<FixableResult> {
+    // Find the result for this file
+    const result = results.find(r => r.testFilePath === testFilePath);
+    if (!result) {
+        return {
+            isFixable: false,
+            error: 'File not found in analysis results'
+        };
+    }
+
+    // Check if it has a directory structure error that can be fixed
+    const error = result.errors.find(e => 
+        e.type === AnalysisErrorType.InvalidDirectoryStructure && 
+        e.actualTestPath && 
+        e.expectedTestPath && 
+        e.sourceFilePath
+    );
+
+    if (!error) {
+        return {
+            isFixable: false,
+            error: 'File has no fixable directory structure issues'
+        };
+    }
+
+    return {
+        isFixable: true,
+        fix: async () => {
+            const fixedFiles: FixResult[] = [];
+            await moveTestFile(error, fixedFiles);
+            return fixedFiles[0];
+        }
+    };
+}
+
 export async function fixDirectoryStructure(results: AnalysisResult[], options: AnalyzerOptions): Promise<FixResult[]> {
     const fixedFiles: FixResult[] = [];
 
