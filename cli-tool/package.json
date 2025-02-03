@@ -1,38 +1,41 @@
 {
-  "name": "test-filestructure-linter-cli",
+  "name": "@test-filestructure-linter/cli",
   "version": "0.1.0",
-  "description": "CLI tool for analyzing test file structure in .NET projects",
+  "description": "CLI tool for test structure linting",
   "author": {
     "name": "Grzegorz Pawłowski",
     "email": "kontakt@grzegorzpawlowski.pl"
   },
+  "main": "dist/index.js",
   "bin": {
-    "test-filestructure-lint": "./dist/cli.js"
+    "test-structure-linter": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
-    "start": "node ./dist/cli.js",
-    "dev": "ts-node ./src/cli.ts",
+    "clean": "rimraf dist",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
     "test": "jest"
   },
   "dependencies": {
+    "@test-filestructure-linter/shared": "file:../shared",
     "chalk": "^4.1.2",
     "cli-progress": "^3.12.0",
     "commander": "^11.1.0",
     "figlet": "^1.7.0",
-    "glob": "^7.2.3"
+    "glob": "^7.2.3",
+    "rimraf": "^5.0.5"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.5",
     "@types/figlet": "^1.5.8",
-    "@types/node": "^20.11.0",
+    "@types/node": "^20.11.17",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "main": "index.js",
   "keywords": [],
   "license": "GPL-3.0"
 }
