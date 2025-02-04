@@ -25,7 +25,7 @@ program
     .option('-e, --file-extension <ext>', 'File extension to analyze', DEFAULT_OPTIONS.fileExtension)
     .option('--no-validate-filename', 'Disable filename validation')
     .option('--no-validate-directory', 'Disable directory structure validation')
-    .option('--no-validate-missing', 'Disable missing tests validation')
+    .option('--validate-missing', 'Enable validation of missing test files')
     .option('--test-suffix <suffix>', 'Test file suffix', DEFAULT_OPTIONS.testFileSuffix)
     .option('--test-project-suffix <suffix>', 'Test project suffix', DEFAULT_OPTIONS.testProjectSuffix)
     .option('--fix-all', 'Fix all directory structure issues by moving files to their expected locations')
@@ -49,7 +49,7 @@ program
                 fileExtension: options.fileExtension,
                 validateFileName: options.validateFilename !== false,
                 validateDirectoryStructure: options.validateDirectory !== false,
-                validateMissingTests: options.validateMissing !== false,
+                validateMissingTests: options.validateMissing === true,
                 testFileSuffix: options.testSuffix,
                 testProjectSuffix: options.testProjectSuffix
             };
