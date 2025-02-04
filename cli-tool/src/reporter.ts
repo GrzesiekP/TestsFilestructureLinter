@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import * as cliProgress from 'cli-progress';
-import { ConsoleReporter as SharedConsoleReporter, AnalysisResult } from '@test-filestructure-linter/shared';
+import { ConsoleReporter as SharedConsoleReporter, AnalysisResult, AnalysisErrorType } from '@test-filestructure-linter/shared';
+import * as path from 'path';
 
 /**
  * Console reporter for displaying analysis results in the terminal.
@@ -45,7 +46,43 @@ export class ConsoleReporter {
     /**
      * Report analysis results to the console with colored output.
      */
-    public reportResults(results: AnalysisResult[], totalFiles: number): void {
-        this.sharedReporter.reportResults(results, totalFiles);
+    public reportResults(results: AnalysisResult[], totalFiles: number, isInteractive = false): void {
+        if (isInteractive) {
+            this.reportFixableFiles(results);
+        } else {
+            this.sharedReporter.reportResults(results, totalFiles);
+        }
+    }
+
+    /**
+     * Report only fixable files for interactive mode
+     */
+    private reportFixableFiles(results: AnalysisResult[]): void {
+        const fixableFiles = results.filter(r => 
+            r.errors.some(e => 
+                e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+                e.actualTestPath &&
+                e.expectedTestPath &&
+                e.sourceFilePath
+            )
+        );
+
+        if (fixableFiles.length === 0) {
+            console.log(chalk.yellow('\nNo fixable files found.'));
+            return;
+        }
+
+        console.log(chalk.cyan('\nFixable files found:'));
+        console.log(chalk.gray('Select files to fix in the next step.\n'));
+
+        fixableFiles.forEach(file => {
+            const error = file.errors.find(e => e.type === AnalysisErrorType.InvalidDirectoryStructure);
+            if (error?.actualTestPath && error?.expectedTestPath) {
+                console.log(chalk.white(path.basename(file.testFilePath)));
+                console.log(chalk.gray(`  Current:  ${error.actualTestPath}`));
+                console.log(chalk.gray(`  Expected: ${error.expectedTestPath}`));
+                console.log('');
+            }
+        });
     }
 } 

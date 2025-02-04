@@ -3,10 +3,15 @@ import { AnalysisResult, AnalysisErrorType } from './types';
 import * as path from 'path';
 
 export class ConsoleReporter {
-    reportResults(results: AnalysisResult[], totalFiles: number): void {
+    reportResults(results: AnalysisResult[], totalFiles: number, isInteractive = false): void {
         if (results.length === 0) {
             console.log(chalk.green('\n✓ No issues found'));
             console.log(chalk.gray(`\n📊 Total files analyzed: ${chalk.white(totalFiles)}`));
+            return;
+        }
+
+        if (isInteractive) {
+            // In interactive mode, don't show the full report
             return;
         }
 
