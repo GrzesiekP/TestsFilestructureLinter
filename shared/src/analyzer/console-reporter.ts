@@ -3,18 +3,35 @@ import { AnalysisResult, AnalysisErrorType } from './types';
 import * as path from 'path';
 
 export class ConsoleReporter {
-    reportResults(results: AnalysisResult[]): void {
+    reportResults(results: AnalysisResult[], totalFiles: number): void {
         if (results.length === 0) {
             console.log(chalk.green('\n✓ No issues found'));
+            console.log(chalk.gray(`\n📊 Total files analyzed: ${chalk.white(totalFiles)}`));
             return;
         }
 
         console.log(chalk.yellow(`\n! Found ${results.length} files with issues:\n`));
 
+        // Group errors by type
+        const errorCounts = {
+            directoryStructure: 0,
+            filename: 0,
+            missingTests: 0
+        };
+
         for (const result of results) {
             console.log(chalk.white(result.testFile));
             for (const error of result.errors) {
                 console.log(chalk.red(`  ${error.type}`));
+                
+                // Count error types
+                if (error.type === AnalysisErrorType.InvalidDirectoryStructure) {
+                    errorCounts.directoryStructure++;
+                } else if (error.type === AnalysisErrorType.InvalidFileName) {
+                    errorCounts.filename++;
+                } else if (error.type === AnalysisErrorType.MissingTest) {
+                    errorCounts.missingTests++;
+                }
                 
                 if (error.type === AnalysisErrorType.InvalidDirectoryStructure && error.sourceFilePath) {
                     const paths = [error.sourceFilePath];
@@ -51,6 +68,24 @@ export class ConsoleReporter {
                 }
             }
             console.log('');
+        }
+
+        // Print summary
+        console.log(chalk.bold('\nSummary:'));
+        if (errorCounts.directoryStructure > 0) {
+            console.log(chalk.gray(`  📁 Directory structure issues: ${chalk.yellow(errorCounts.directoryStructure)}`));
+        }
+        if (errorCounts.filename > 0) {
+            console.log(chalk.gray(`  📝 Filename issues: ${chalk.yellow(errorCounts.filename)}`));
+        }
+        if (errorCounts.missingTests > 0) {
+            console.log(chalk.gray(`  ❓ Missing tests: ${chalk.yellow(errorCounts.missingTests)}`));
+        }
+        console.log(chalk.gray(`  📊 Total files with issues: ${chalk.yellow(results.length)}`));
+        console.log(chalk.gray(`  📊 Total files analyzed: ${chalk.white(totalFiles)}`));
+        if (totalFiles > 0) {
+            const percentage = ((results.length / totalFiles) * 100).toFixed(1);
+            console.log(chalk.gray(`  📈 Issue rate: ${chalk.yellow(percentage)}%`));
         }
     }
 

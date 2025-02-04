@@ -56,7 +56,7 @@ program
             
             console.log(chalk.cyan('\nAnalyzing test structure...'));
             const { results, totalFiles } = await analyzeProject(analyzerOptions);
-            reporter.reportResults(results);
+            reporter.reportResults(results, totalFiles);
 
             if (results.length > 0) {
                 if (options.fix) {
