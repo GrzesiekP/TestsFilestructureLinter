@@ -17,19 +17,19 @@ import {
 const program = new Command();
 
 program
-    .name('test-structure-linter')
+    .name('test-filestructure-linter')
     .description('CLI tool for analyzing test file structure')
     .version('0.1.0')
-    .option('-s, --src-root <path>', 'Source files root directory', DEFAULT_OPTIONS.srcRoot)
-    .option('-t, --test-root <path>', 'Test files root directory', DEFAULT_OPTIONS.testRoot)
-    .option('-e, --file-extension <ext>', 'File extension to analyze', DEFAULT_OPTIONS.fileExtension)
-    .option('--validate-filename', 'Enable filename validation')
-    .option('--validate-directory', 'Enable directory structure validation')
-    .option('--validate-missing', 'Enable validation of missing test files')
+    .requiredOption('-s, --src-root <path>', 'Source files root directory')
+    .requiredOption('-t, --test-root <path>', 'Test files root directory')
+    .option('-e, --ext <ext>', 'File extension to analyze', DEFAULT_OPTIONS.fileExtension)
+    .option('-n, --name', 'Enable filename validation')
+    .option('-d, --dir', 'Enable directory structure validation')
+    .option('-m, --missing', 'Enable validation of missing test files')
     .option('--test-suffix <suffix>', 'Test file suffix', DEFAULT_OPTIONS.testFileSuffix)
     .option('--test-project-suffix <suffix>', 'Test project suffix', DEFAULT_OPTIONS.testProjectSuffix)
-    .option('--fix-all', 'Fix all directory structure issues by moving files to their expected locations')
-    .option('--fix <path>', 'Fix a specific test file')
+    .option('-a, --all', 'Fix all directory structure issues by moving files')
+    .option('-f, --fix <path>', 'Fix a specific test file')
     .option('-i, --interactive', 'Interactive mode - select files to fix')
     .action(async (options) => {
         const reporter = new ConsoleReporter();
@@ -46,10 +46,10 @@ program
             const analyzerOptions: AnalyzerOptions = {
                 srcRoot,
                 testRoot,
-                fileExtension: options.fileExtension,
-                validateFileName: options.validateFilename === true,
-                validateDirectoryStructure: options.validateDirectory === true,
-                validateMissingTests: options.validateMissing === true,
+                fileExtension: options.ext,
+                validateFileName: options.name === true,
+                validateDirectoryStructure: options.dir === true,
+                validateMissingTests: options.missing === true,
                 testFileSuffix: options.testSuffix,
                 testProjectSuffix: options.testProjectSuffix
             };
@@ -141,7 +141,7 @@ program
                     if (fixedCount > 0) {
                         console.log(chalk.green(`\n✓ Fixed ${fixedCount} files`));
                     }
-                } else if (options.fixAll) {
+                } else if (options.all) {
                     console.log(chalk.cyan('\nFixing directory structure issues...'));
                     const fixedFiles = await fixDirectoryStructure(results, analyzerOptions);
                     if (fixedFiles.length > 0) {
