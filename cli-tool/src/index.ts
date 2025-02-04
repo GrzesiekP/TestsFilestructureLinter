@@ -89,36 +89,72 @@ program
                         process.exit(1);
                     }
 
-                    const prompt = new MultiSelect({
-                        name: 'files',
-                        message: chalk.cyan('Select files to fix'),
-                        hint: '(Use arrow keys and space to select, enter to confirm)',
-                        choices: fixableFiles.map(file => {
-                            const error = file.errors.find(e => e.type === AnalysisErrorType.InvalidDirectoryStructure);
-                            const currentPath = path.relative(testRoot, file.testFilePath);
-                            const targetPath = error?.expectedTestPath ? 
-                                path.relative(testRoot, error.expectedTestPath) :
-                                '';
+                    const PAGE_SIZE = 10;
+                    let currentPage = 0;
+                    const totalPages = Math.ceil(fixableFiles.length / PAGE_SIZE);
+                    let selectedPaths: string[] = [];
+
+                    try {
+                        while (currentPage < totalPages) {
+                            const startIdx = currentPage * PAGE_SIZE;
+                            const endIdx = Math.min(startIdx + PAGE_SIZE, fixableFiles.length);
+                            const currentFiles = fixableFiles.slice(startIdx, endIdx);
+
+                            console.log(chalk.cyan(`\nPage ${currentPage + 1} of ${totalPages}`));
                             
-                            const pathDisplay = targetPath ? 
-                                `\n    ${chalk.yellow('📂')} Current:  ${chalk.gray(currentPath)}` +
-                                `\n    ${chalk.cyan('📂')} Expected: ${chalk.gray(targetPath)}` :
-                                chalk.gray(currentPath);
+                            const prompt = new MultiSelect({
+                                name: 'files',
+                                message: chalk.cyan('Select files to fix'),
+                                hint: '(Use arrow keys and space to select, enter to confirm)',
+                                choices: currentFiles.map(file => {
+                                    const error = file.errors.find(e => e.type === AnalysisErrorType.InvalidDirectoryStructure);
+                                    const currentPath = path.relative(testRoot, file.testFilePath);
+                                    const targetPath = error?.expectedTestPath ? 
+                                        path.relative(testRoot, error.expectedTestPath) :
+                                        '';
+                                    
+                                    const pathDisplay = targetPath ? 
+                                        `\n    ${chalk.yellow('📂')} Current:  ${chalk.gray(currentPath)}` +
+                                        `\n    ${chalk.cyan('📂')} Expected: ${chalk.gray(targetPath)}` :
+                                        chalk.gray(currentPath);
 
-                            return {
-                                name: file.testFilePath,
-                                value: file.testFilePath,
-                                message: `${chalk.white(file.testFile)}${pathDisplay}`
-                            };
-                        }),
-                        validate: (value: string[]) => value.length > 0 || 'Please select at least one file'
-                    });
+                                    return {
+                                        name: file.testFilePath,
+                                        value: file.testFilePath,
+                                        message: `${chalk.white(file.testFile)}${pathDisplay}`
+                                    };
+                                })
+                            });
 
-                    const selectedPaths = await prompt.run();
+                            const pageSelection = await prompt.run();
+                            if (pageSelection && pageSelection.length > 0) {
+                                selectedPaths.push(...pageSelection);
+                            }
+
+                            if (currentPage < totalPages - 1) {
+                                const continuePrompt = new (require('enquirer')).Toggle({
+                                    message: chalk.cyan('Continue to next page?'),
+                                    enabled: 'Yes',
+                                    disabled: 'No'
+                                });
+
+                                const shouldContinue = await continuePrompt.run();
+                                if (!shouldContinue) {
+                                    break;
+                                }
+                            }
+
+                            currentPage++;
+                        }
+                    } catch (err) {
+                        // User canceled the selection
+                        console.log(chalk.gray('\nSelection canceled.'));
+                        process.exit(0);
+                    }
                     
                     if (!selectedPaths || selectedPaths.length === 0) {
-                        console.error(chalk.red('\nError: No files selected'));
-                        process.exit(1);
+                        console.log(chalk.yellow('\nNo files selected for fixing.'));
+                        process.exit(0);
                     }
 
                     console.log(chalk.cyan('\nFixing selected files...'));

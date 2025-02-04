@@ -72,17 +72,7 @@ export class ConsoleReporter {
             return;
         }
 
-        console.log(chalk.cyan('\nFixable files found:'));
-        console.log(chalk.gray('Select files to fix in the next step.\n'));
-
-        fixableFiles.forEach(file => {
-            const error = file.errors.find(e => e.type === AnalysisErrorType.InvalidDirectoryStructure);
-            if (error?.actualTestPath && error?.expectedTestPath) {
-                console.log(chalk.white(path.basename(file.testFilePath)));
-                console.log(chalk.gray(`  Current:  ${error.actualTestPath}`));
-                console.log(chalk.gray(`  Expected: ${error.expectedTestPath}`));
-                console.log('');
-            }
-        });
+        console.log(chalk.cyan(`\nFound ${fixableFiles.length} fixable files`));
+        console.log(chalk.gray('Files will be shown in pages of 10. Select files to fix in each page.\n'));
     }
 } 
