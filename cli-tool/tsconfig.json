@@ -3,15 +3,20 @@
     "target": "es2020",
     "module": "commonjs",
     "declaration": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "composite": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "@test-filestructure-linter/shared": ["../shared/src"]
+    }
   },
-  "include": ["src/**/*"],
   "references": [
     { "path": "../shared" }
-  ]
+  ],
+  "include": ["src/**/*"]
 } 

@@ -1,5 +1,5 @@
 {
-  "name": "@test-filestructure-linter/cli",
+  "name": "test-filestructure-linter-cli",
   "version": "0.1.0",
   "description": "CLI tool for test structure linting",
   "author": {
@@ -8,10 +8,10 @@
   },
   "main": "dist/index.js",
   "bin": {
-    "test-structure-linter": "./dist/index.js"
+    "test-structure-linter": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --build",
     "clean": "rimraf dist",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
@@ -38,5 +38,8 @@
     "node": ">=18.0.0"
   },
   "keywords": [],
-  "license": "GPL-3.0"
+  "license": "GPL-3.0",
+  "publishConfig": {
+    "access": "public"
+  }
 }
