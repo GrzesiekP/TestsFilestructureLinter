@@ -58,17 +58,42 @@ export class ConsoleReporter {
      * Report only fixable files for interactive mode
      */
     private reportFixableFiles(results: AnalysisResult[]): void {
+        // Filter out files that have multiple source files
+        const multipleSourceFiles = results.filter(r => 
+            r.errors.some(e => 
+                e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+                e.sourceFilePath &&
+                e.sourceFilePath.split(',').length > 1
+            )
+        );
+
+        // Filter fixable files (those with single source file)
         const fixableFiles = results.filter(r => 
             r.errors.some(e => 
                 e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+                e.sourceFilePath &&
+                e.sourceFilePath.split(',').length === 1 &&
                 e.actualTestPath &&
-                e.expectedTestPath &&
-                e.sourceFilePath
+                e.expectedTestPath
             )
         );
 
         if (fixableFiles.length === 0) {
             console.log(chalk.yellow('\nNo fixable files found.'));
+            
+            if (multipleSourceFiles.length > 0) {
+                console.log(chalk.yellow('\nThe following files have multiple matching source files and cannot be fixed automatically:'));
+                multipleSourceFiles.forEach(file => {
+                    const error = file.errors.find(e => e.type === AnalysisErrorType.InvalidDirectoryStructure);
+                    if (error?.sourceFilePath) {
+                        console.log(chalk.gray(`\n${file.testFile}:`));
+                        const sourcePaths = error.sourceFilePath.split(',').map(p => p.trim());
+                        sourcePaths.forEach(path => {
+                            console.log(chalk.gray(`  Found in: ${path}`));
+                        });
+                    }
+                });
+            }
             return;
         }
 

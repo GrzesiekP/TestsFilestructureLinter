@@ -132,7 +132,7 @@ export class ConsoleReporter {
         try {
             const relative = path.relative(basePath, filePath);
             if (relative === '') {
-                return '.';
+                return 'Source file not found';
             }
             if (relative.startsWith('..')) {
                 return this.formatPath(filePath);

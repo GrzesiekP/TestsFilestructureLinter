@@ -18,15 +18,43 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
     );
     const sourceFiles = await findSourceFiles(mergedOptions.srcRoot, mergedOptions.fileExtension);
     
-    // Create a map of source file names to their full paths for quick lookup
-    const sourceFileMap = new Map<string, string>();
-    for (const sourceFile of sourceFiles) {
-        const baseName = path.basename(sourceFile, path.extname(sourceFile));
-        sourceFileMap.set(baseName, sourceFile);
-    }
-    
     for (const testFile of testFiles) {
-        const result = await analyzeTestFile(path.resolve(testFile), mergedOptions, sourceFileMap);
+        const testFileName = path.basename(testFile, mergedOptions.fileExtension);
+        const sourceFileName = testFileName.replace(new RegExp(`${mergedOptions.testFileSuffix}$`), '');
+        const matchingSourceFiles = await findMatchingSourceFiles(sourceFiles, sourceFileName, mergedOptions.fileExtension);
+
+        const result: AnalysisResult = {
+            testFile: path.basename(testFile),
+            testFilePath: path.resolve(testFile),
+            errors: []
+        };
+
+        if (matchingSourceFiles.length === 0) {
+            result.errors.push({
+                type: AnalysisErrorType.InvalidDirectoryStructure,
+                message: `Source file not found: ${sourceFileName}${mergedOptions.fileExtension}`
+            });
+        } else if (matchingSourceFiles.length > 1) {
+            result.errors.push({
+                type: AnalysisErrorType.InvalidDirectoryStructure,
+                message: `Multiple matching source files found (${matchingSourceFiles.length}). Unable to determine correct source file`,
+                sourceFilePath: matchingSourceFiles.join(', ')
+            });
+        } else {
+            const sourcePath = matchingSourceFiles[0];
+            const expectedTestPath = calculateExpectedTestPath(sourcePath, mergedOptions);
+            
+            if (path.normalize(testFile) !== path.normalize(expectedTestPath)) {
+                result.errors.push({
+                    type: AnalysisErrorType.InvalidDirectoryStructure,
+                    message: 'Test file is in wrong directory',
+                    sourceFilePath: sourcePath,
+                    actualTestPath: testFile,
+                    expectedTestPath: expectedTestPath
+                });
+            }
+        }
+
         if (result.errors.length > 0) {
             results.push(result);
         }
@@ -36,11 +64,6 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
         const missingTestResults = await analyzeMissingTests(sourceFiles, testFiles, mergedOptions);
         results.push(...missingTestResults);
     }
-    
-    // Add test root to each result for reporting
-    results.forEach(result => {
-        result.testRoot = mergedOptions.testRoot;
-    });
     
     return {
         results,
@@ -66,39 +89,33 @@ async function findTestFiles(dir: string, extension: string, testFileSuffix: str
 async function findSourceFiles(dir: string, extension: string): Promise<string[]> {
     try {
         const files = await glob(`${dir}/**/*${extension}`);
-        return files.map(f => path.resolve(f));
+        return files.map(f => {
+            const resolvedPath = path.resolve(f);
+            return resolvedPath;
+        });
     } catch (error) {
         console.error('Error finding source files:', error);
         return [];
     }
 }
 
-async function analyzeTestFile(
-    testFilePath: string,
-    options: AnalyzerOptions,
-    sourceFileMap: Map<string, string>
-): Promise<AnalysisResult> {
-    const result: AnalysisResult = {
-        testFile: path.basename(testFilePath),
-        testFilePath: path.resolve(testFilePath),
-        errors: []
-    };
+function createSourceFileMap(sourceFiles: string[], extension: string): Map<string, string[]> {
+    const sourceMap = new Map<string, string[]>();
     
-    if (options.validateFileName) {
-        const fileNameError = validateFileName(testFilePath, options.testFileSuffix);
-        if (fileNameError) {
-            result.errors.push(fileNameError);
-        }
-    }
+    sourceFiles.forEach(file => {
+        const baseName = path.basename(file, extension).toLowerCase();
+        const existingPaths = sourceMap.get(baseName) || [];
+        sourceMap.set(baseName, [...existingPaths, file]);
+    });
     
-    if (options.validateDirectoryStructure) {
-        const structureError = validateDirectoryStructure(testFilePath, options, sourceFileMap);
-        if (structureError) {
-            result.errors.push(structureError);
-        }
-    }
-    
-    return result;
+    return sourceMap;
+}
+
+async function findMatchingSourceFiles(sourceFiles: string[], baseName: string, extension: string): Promise<string[]> {
+    return sourceFiles.filter(file => {
+        const fileBaseName = path.basename(file, extension);
+        return fileBaseName.toLowerCase() === baseName.toLowerCase();
+    });
 }
 
 function validateFileName(filePath: string, suffix: string): AnalysisError | null {
@@ -115,56 +132,90 @@ function validateFileName(filePath: string, suffix: string): AnalysisError | nul
 function validateDirectoryStructure(
     testFilePath: string,
     options: AnalyzerOptions,
-    sourceFileMap: Map<string, string>
+    sourceFiles: string[]
 ): AnalysisError | null {
-    const testFileName = path.basename(testFilePath, path.extname(testFilePath));
-    const sourceFileName = testFileName.replace(new RegExp(`${options.testFileSuffix}$`), '');
-    const sourceFilePath = sourceFileMap.get(sourceFileName);
+    try {
+        const testFileName = path.basename(testFilePath, path.extname(testFilePath));
+        const sourceFileName = testFileName.replace(new RegExp(`${options.testFileSuffix}$`), '').toLowerCase();
+        
+        // Find all source files with matching base name
+        const matchingSourceFiles = sourceFiles.filter(file => {
+            const fileBaseName = path.basename(file, options.fileExtension);
+            return fileBaseName.toLowerCase() === sourceFileName.toLowerCase();
+        });
 
-    if (!sourceFilePath) {
-        // Try to find source file with similar name in any directory
-        const potentialSourceFiles = Array.from(sourceFileMap.entries())
-            .filter(([name]) => name.toLowerCase() === sourceFileName.toLowerCase());
-
-        if (potentialSourceFiles.length > 0) {
-            const [, foundSourcePath] = potentialSourceFiles[0];
-            const expectedTestPath = calculateExpectedTestPath(foundSourcePath, options);
-            const firstIncorrectSegment = findFirstIncorrectSegment(testFilePath, expectedTestPath, options);
-
+        if (matchingSourceFiles.length === 0) {
             return {
                 type: AnalysisErrorType.InvalidDirectoryStructure,
-                message: firstIncorrectSegment ? 
-                    `Test file has incorrect path segment: '${firstIncorrectSegment}'` :
-                    'Test file is in wrong directory',
-                sourceFilePath: foundSourcePath,
-                actualTestPath: testFilePath,
-                expectedTestPath: expectedTestPath
+                message: `Source file not found: ${sourceFileName}${options.fileExtension}`
             };
         }
 
+        if (matchingSourceFiles.length > 1) {
+            // Convert absolute paths to relative paths for display
+            const relativePaths = matchingSourceFiles.map(file => {
+                const relativePath = path.relative(options.srcRoot, file);
+                return path.join('./src', relativePath);
+            });
+
+            // Get the relative path of the test file
+            const relativeTestPath = path.relative(options.testRoot, testFilePath);
+            const testDirPath = path.dirname(relativeTestPath);
+
+            // Try to find a matching source file in a directory with the same name
+            const matchingSourceByDir = matchingSourceFiles.find(file => {
+                const relativeSourcePath = path.relative(options.srcRoot, file);
+                const sourceDirPath = path.dirname(relativeSourcePath);
+                return sourceDirPath.toLowerCase().includes(testDirPath.toLowerCase());
+            });
+
+            if (matchingSourceByDir) {
+                const expectedTestPath = calculateExpectedTestPath(matchingSourceByDir, options);
+                if (path.normalize(testFilePath) !== path.normalize(expectedTestPath)) {
+                    return {
+                        type: AnalysisErrorType.InvalidDirectoryStructure,
+                        message: 'Test file is in wrong directory',
+                        sourceFilePath: path.join('./src', path.relative(options.srcRoot, matchingSourceByDir)),
+                        actualTestPath: path.join('./tests', relativeTestPath),
+                        expectedTestPath: path.join('./tests', path.relative(options.testRoot, expectedTestPath))
+                    };
+                }
+                return null;
+            }
+
+            return {
+                type: AnalysisErrorType.InvalidDirectoryStructure,
+                message: `Multiple matching source files found (${matchingSourceFiles.length}). Unable to determine correct source file`,
+                sourceFilePath: relativePaths.join(', ')
+            };
+        }
+
+        const sourceFilePath = matchingSourceFiles[0];
+        const expectedTestPath = calculateExpectedTestPath(sourceFilePath, options);
+        
+        if (path.normalize(testFilePath) !== path.normalize(expectedTestPath)) {
+            // Convert absolute paths to relative paths for display
+            const relativeSourcePath = path.relative(options.srcRoot, sourceFilePath);
+            const relativeTestPath = path.relative(options.testRoot, testFilePath);
+            const relativeExpectedPath = path.relative(options.testRoot, expectedTestPath);
+
+            return {
+                type: AnalysisErrorType.InvalidDirectoryStructure,
+                message: 'Test file is in wrong directory',
+                sourceFilePath: path.join('./src', relativeSourcePath),
+                actualTestPath: path.join('./tests', relativeTestPath),
+                expectedTestPath: path.join('./tests', relativeExpectedPath)
+            };
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error in validateDirectoryStructure:', error);
         return {
             type: AnalysisErrorType.InvalidDirectoryStructure,
-            message: `Source file not found`
+            message: `Error validating directory structure: ${error instanceof Error ? error.message : 'Unknown error'}`
         };
     }
-
-    // Get the relative paths from their respective roots
-    const expectedTestPath = calculateExpectedTestPath(sourceFilePath, options);
-    const firstIncorrectSegment = findFirstIncorrectSegment(testFilePath, expectedTestPath, options);
-
-    if (firstIncorrectSegment || path.normalize(testFilePath) !== path.normalize(expectedTestPath)) {
-        return {
-            type: AnalysisErrorType.InvalidDirectoryStructure,
-            message: firstIncorrectSegment ? 
-                `Test file has incorrect path segment: '${firstIncorrectSegment}'` :
-                'Test file is in wrong directory',
-            sourceFilePath: sourceFilePath,
-            actualTestPath: testFilePath,
-            expectedTestPath: expectedTestPath
-        };
-    }
-
-    return null;
 }
 
 function findFirstIncorrectSegment(actualPath: string, expectedPath: string, options: AnalyzerOptions): string | null {
@@ -193,22 +244,27 @@ function findFirstIncorrectSegment(actualPath: string, expectedPath: string, opt
 }
 
 function calculateExpectedTestPath(sourceFilePath: string, options: AnalyzerOptions): string {
-    const relativeSourcePath = path.relative(options.srcRoot, path.dirname(sourceFilePath));
-    const sourceSegments = relativeSourcePath.split(path.sep);
-    const testSegments = [...sourceSegments];
-
-    // Add the test project suffix to the first directory
-    if (testSegments.length > 0) {
-        testSegments[0] = testSegments[0] + options.testProjectSuffix;
-    }
-
+    // Get the relative path from source root
+    const relativePath = path.relative(options.srcRoot, sourceFilePath);
+    const sourceSegments = relativePath.split(/[\/\\]/);
+    
+    // Get the project name (first segment) and add test suffix
+    const projectName = sourceSegments[0];
+    const testProjectName = projectName + options.testProjectSuffix;
+    
+    // Get the remaining path segments (excluding the project name and file name)
+    const remainingPath = sourceSegments.slice(1, -1);
+    
+    // Get the source file name and convert it to test file name
     const sourceFileName = path.basename(sourceFilePath);
     const testFileName = sourceFileName.replace(path.extname(sourceFileName), '') + 
         options.testFileSuffix + path.extname(sourceFileName);
 
+    // Construct the expected test path
     return path.join(
         options.testRoot,
-        ...testSegments,
+        testProjectName,
+        ...remainingPath,
         testFileName
     );
 }
