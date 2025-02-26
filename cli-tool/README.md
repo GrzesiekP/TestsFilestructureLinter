@@ -5,13 +5,13 @@ A command-line interface for analyzing and fixing test file structure in .NET so
 ## Installation
 
 ```bash
-npm install -g test-filestructure-linter
+npm install -g @test-filestructure-linter/cli
 ```
 
 ## Usage
 
 ```bash
-test-filestructure-linter -s <src-root> -t <test-root> [options]
+test-structure-linter -s <src-root> -t <test-root> [options]
 ```
 
 ## Options
