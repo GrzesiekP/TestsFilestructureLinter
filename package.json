@@ -8,7 +8,7 @@
   },
   "main": "dist/index.js",
   "bin": {
-    "test-structure-linter": "dist/index.js"
+    "test-filestructure-linter": "dist/index.js"
   },
   "scripts": {
     "build": "tsc --build",
