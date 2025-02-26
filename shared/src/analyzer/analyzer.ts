@@ -1,6 +1,10 @@
 import * as path from 'path';
 import { glob } from 'glob';
+import { promisify } from 'util';
 import { AnalysisResult, AnalysisError, AnalysisErrorType, AnalyzerOptions, DEFAULT_OPTIONS } from './types';
+
+// Promisify the glob function
+const globAsync = promisify(glob);
 
 export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Promise<{ results: AnalysisResult[]; totalFiles: number }> {
     const mergedOptions: AnalyzerOptions = {
@@ -108,10 +112,10 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
 
 async function findTestFiles(dir: string, extension: string, testFileSuffix: string): Promise<string[]> {
     try {
-        const files = await glob(`${dir}/**/*${extension}`);
+        const files = await globAsync(`${dir}/**/*${extension}`, { ignore: ["**/node_modules/**"] }) as string[];
         return files
-            .map(f => path.resolve(f))
-            .filter(f => {
+            .map((f: string) => path.resolve(f))
+            .filter((f: string) => {
                 const fileName = path.basename(f, path.extname(f));
                 return fileName.endsWith(testFileSuffix);
             });
@@ -123,8 +127,8 @@ async function findTestFiles(dir: string, extension: string, testFileSuffix: str
 
 async function findSourceFiles(dir: string, extension: string): Promise<string[]> {
     try {
-        const files = await glob(`${dir}/**/*${extension}`);
-        return files.map(f => {
+        const files = await globAsync(`${dir}/**/*${extension}`, { ignore: ["**/node_modules/**"] }) as string[];
+        return files.map((f: string) => {
             const resolvedPath = path.resolve(f);
             return resolvedPath;
         });
