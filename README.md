@@ -1,111 +1,123 @@
-# Tests Filestructure Linter
+# Test Filestructure Linter CLI
 
-A PowerShell script that validates and fixes test file structure in a .NET solution, ensuring test files are properly named and located in directories matching their tested classes.
-
-## Author
-Grzegorz Pawlowski (kontakt@grzegorzpawlowski.pl)
-
-## Repository
-https://github.com/GrzesiekP/TestsFilestructureLinter
-
-## Features
-
-- Validates test file names match their class names
-- Verifies test files reference their tested classes
-- Ensures test files are in correct directories matching source file structure
-- Automatically fixes found issues (optional)
-- Generates CSV reports of validation results
-- Uses Git for file operations to maintain history
-- Configurable source and test folders
-- Configurable file extension support
-- Only analyzes projects that end with ".Tests" (e.g. "Project.Tests")
-
-## Requirements
-
-- PowerShell
-- Git
-- .NET solution with test projects
+A command-line interface for analyzing and fixing test file structure in .NET solutions.
 
 ## Installation
 
-1. Clone the repository or copy the script to your solution's `scripts/tests` directory
-2. Ensure the script has execution permissions
+```bash
+npm install -g @test-filestructure-linter/cli
+```
 
 ## Usage
 
-```powershell
-.\TestsFilestructureLinter.ps1 [options]
+```bash
+test-structure-linter -s <src-root> -t <test-root> [options]
 ```
 
-### Options
+## Options
 
-- `-SaveToCsv` (`-s`): Saves validation errors to a CSV file
-- `-Fix` (`-f`): Automatically fixes found issues
-- `-FixAndReport` (`-fr`): Fixes issues and saves report
-- `-Help` (`-h`): Shows help message
-- `-Verbose` (`-v`): Shows detailed progress
-- `-SourceFolder` (`-sf`): Name of folder where source files are stored (default: "src")
-- `-TestFolder` (`-tf`): Name of folder where test files are stored (default: "tests")
-- `-FileExtension` (`-fe`): File extension to process (default: ".cs")
+```
+Required:
+  -s, --src-root <path>           Source files root directory
+  -t, --test-root <path>          Test files root directory
 
-### Examples
+Validation:
+  -n, --name                      Enable filename validation
+  -d, --dir                       Enable directory structure validation
+  -m, --missing                   Enable validation of missing test files
 
-```powershell
-# Just validate
-.\TestsFilestructureLinter.ps1
+Fix modes:
+  -a, --all                       Fix all directory structure issues
+  -f, --fix <path>               Fix a specific test file
+  -i, --interactive              Interactive mode - select files to fix
 
-# Validate and save results
-.\TestsFilestructureLinter.ps1 -s
-
-# Fix issues
-.\TestsFilestructureLinter.ps1 -f
-
-# Fix and report
-.\TestsFilestructureLinter.ps1 -fr
-
-# Use custom folders and extension
-.\TestsFilestructureLinter.ps1 -sf source -tf test -fe .vb
-
-# Show help
-.\TestsFilestructureLinter.ps1 -h
+Other options:
+  -e, --ext <ext>                File extension to analyze (default: ".cs")
+  --test-suffix <suffix>          Test file suffix (default: "Tests")
+  --test-project-suffix <suffix>  Test project suffix (default: ".Tests")
+  -h, --help                     Display help
+  -V, --version                  Display version
 ```
 
-## Validation Rules
+## Examples
 
-1. **File Names**
-   - Test files must end with "Tests.cs"
-   - File name must match the contained test class name
+```bash
+# Basic analysis (no validations enabled)
+test-filestructure-linter -s ./src -t ./tests
 
-2. **Class References**
-   - Test file must contain a reference to the class it's testing
-   - Class name is derived by removing "Tests" suffix from test class name
+# Enable specific validations
+test-filestructure-linter -s ./src -t ./tests -d
+test-filestructure-linter -s ./src -t ./tests -n
+test-filestructure-linter -s ./src -t ./tests -m
 
-3. **Directory Structure**
-   - Test files must be in a directory structure matching their tested class
-   - Example: If `src/Project/Feature/Class.cs` exists, test should be in `tests/Project.Tests/Feature/ClassTests.cs`
+# Enable all validations
+test-filestructure-linter -s ./src -t ./tests -d -n -m
 
-## Fix Operations
+# Fix all directory structure issues
+test-filestructure-linter -s ./src -t ./tests -d -a
 
-When run with `-Fix` or `-FixAndReport`, the script will:
+# Fix specific file
+test-filestructure-linter -s ./src -t ./tests -d -f ./tests/Wrong/Path/MyTests.cs
 
-1. Rename test files to match their class names
-2. Move test files to correct directories
-3. Create necessary directories if they don't exist
-4. Use `git mv` to maintain file history
+# Interactive mode
+test-filestructure-linter -s ./src -t ./tests -d -i
 
-## Output
+# Custom file extension and suffixes
+test-filestructure-linter -s ./src -t ./tests -e .vb --test-suffix Spec --test-project-suffix .Specs
 
-- Console output shows progress and summary
-- CSV report (optional) includes:
-  - Test file name
-  - Test file path
-  - Error description
-  - Whether the error was fixed
+# Using relative or absolute paths
+test-filestructure-linter -s ../../MyProject/src -t ../../MyProject/tests
+test-filestructure-linter -s C:/Projects/MyApp/src -t C:/Projects/MyApp/tests
+```
+
+## Validation Types
+
+### File Name Validation
+When enabled with `-n` or `--name`, checks if:
+- Test files end with the configured suffix (default: "Tests.cs")
+- File names match their contained test class names
+
+### Directory Structure Validation
+When enabled with `-d` or `--dir`, verifies that:
+- Test files are in directories matching their source file structure
+- Example: If source is at `src/Project/Feature/Class.cs`, test should be at `tests/Project.Tests/Feature/ClassTests.cs`
+
+### Missing Test Validation
+When enabled with `-m` or `--missing`, checks for:
+- Source files that don't have corresponding test files
+
+## Fix Modes
+
+### Fix All
+```bash
+-a, --all
+```
+- Automatically moves all test files to their correct locations
+- Creates necessary directories if they don't exist
+
+### Fix Specific File
+```bash
+-f, --fix <path>
+```
+- Moves a single test file to its correct location
+- Validates if the file can be fixed before attempting
+- Reports error if fix is not possible
+
+### Interactive Mode
+```bash
+-i, --interactive
+```
+- Displays a list of fixable files with:
+  - 📄 Source file paths
+  - 🧪 Current test file paths
+  - ✨ Expected test file paths
+- Allows selecting multiple files using checkboxes
+- Shows fix operation results
 
 ## Notes
-
-- The script uses Git for file operations to maintain history
-- Verbose output helps diagnose issues
-- CSV reports include timestamps
-- Unrecognized arguments trigger help display
-- If specified source or test folders do not exist in repository root directory, script will display warning and exit
+- Source and test root paths are required
+- All validations are opt-in and must be explicitly enabled
+- Fix operations require directory structure validation to be enabled
+- The tool will create necessary directories when fixing file locations
+- Works with both relative and absolute paths
+- Supports Windows and Unix-style paths 
