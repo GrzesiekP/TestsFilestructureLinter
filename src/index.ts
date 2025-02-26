@@ -14,7 +14,7 @@ import {
     AnalysisErrorType,
     AnalysisResult,
     AnalysisError
-} from '@test-filestructure-linter/shared';
+} from './core';
 
 const program = new Command();
 
