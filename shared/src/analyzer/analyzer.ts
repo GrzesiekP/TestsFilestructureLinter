@@ -35,12 +35,46 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
                 message: `Source file not found: ${sourceFileName}${mergedOptions.fileExtension}`
             });
         } else if (matchingSourceFiles.length > 1) {
-            result.errors.push({
-                type: AnalysisErrorType.InvalidDirectoryStructure,
-                message: `Multiple matching source files found (${matchingSourceFiles.length}). Unable to determine correct source file`,
-                sourceFilePath: matchingSourceFiles.join(', '),
-                actualTestPath: path.join('./tests', path.relative(mergedOptions.testRoot, testFile))
+            // Try to find a matching source file based on subdirectory structure
+            const relativeTestPath = path.relative(mergedOptions.testRoot, testFile);
+            const testDirPath = path.dirname(relativeTestPath);
+            const testDirSegments = testDirPath.split(/[\/\\]/);
+            const lastTestDirSegment = testDirSegments[testDirSegments.length - 1];
+
+            // Try to find a source file with matching directory structure
+            let matchingSourceByDir = matchingSourceFiles.find(file => {
+                const relativeSourcePath = path.relative(mergedOptions.srcRoot, file);
+                const sourceDirPath = path.dirname(relativeSourcePath);
+                const sourceDirSegments = sourceDirPath.split(/[\/\\]/);
+                const lastSourceDirSegment = sourceDirSegments[sourceDirSegments.length - 1];
+                
+                return lastSourceDirSegment && lastTestDirSegment &&
+                       lastSourceDirSegment.toLowerCase() === lastTestDirSegment.toLowerCase();
             });
+
+            if (matchingSourceByDir) {
+                // We found a matching source file based on directory - check if the test file is in the expected location
+                const expectedTestPath = calculateExpectedTestPath(matchingSourceByDir, mergedOptions);
+                
+                if (path.normalize(testFile) !== path.normalize(expectedTestPath)) {
+                    result.errors.push({
+                        type: AnalysisErrorType.InvalidDirectoryStructure,
+                        message: 'Test file is in wrong directory',
+                        sourceFilePath: matchingSourceByDir,
+                        actualTestPath: testFile,
+                        expectedTestPath: expectedTestPath
+                    });
+                }
+                // No error if the subdirectory matching source file corresponds to the correct test location
+            } else {
+                // No matching subdirectory - report multiple source files
+                result.errors.push({
+                    type: AnalysisErrorType.InvalidDirectoryStructure,
+                    message: `Multiple matching source files found (${matchingSourceFiles.length}). Unable to determine correct source file`,
+                    sourceFilePath: matchingSourceFiles.join(', '),
+                    actualTestPath: path.join('./tests', path.relative(mergedOptions.testRoot, testFile))
+                });
+            }
         } else {
             const sourcePath = matchingSourceFiles[0];
             const expectedTestPath = calculateExpectedTestPath(sourcePath, mergedOptions);
@@ -153,26 +187,28 @@ function validateDirectoryStructure(
         }
 
         if (matchingSourceFiles.length > 1) {
-            // Convert absolute paths to relative paths for display
-            const relativePaths = matchingSourceFiles.map(file => {
-                const relativePath = path.relative(options.srcRoot, file);
-                return path.join('./src', relativePath);
-            });
-
             // Get the relative path of the test file
             const relativeTestPath = path.relative(options.testRoot, testFilePath);
             const testDirPath = path.dirname(relativeTestPath);
-
-            // Try to find a matching source file in a directory with the same name
+            const testDirSegments = testDirPath.split(/[\/\\]/);
+            const lastTestDirSegment = testDirSegments[testDirSegments.length - 1];
+            
+            // Try to find a source file with matching subdirectory structure
             const matchingSourceByDir = matchingSourceFiles.find(file => {
                 const relativeSourcePath = path.relative(options.srcRoot, file);
                 const sourceDirPath = path.dirname(relativeSourcePath);
-                return sourceDirPath.toLowerCase().includes(testDirPath.toLowerCase());
+                const sourceDirSegments = sourceDirPath.split(/[\/\\]/);
+                const lastSourceDirSegment = sourceDirSegments[sourceDirSegments.length - 1];
+                
+                return lastSourceDirSegment && lastTestDirSegment && 
+                       lastSourceDirSegment.toLowerCase() === lastTestDirSegment.toLowerCase();
             });
 
             if (matchingSourceByDir) {
+                // We found a match based on directory structure, check if it's in the right location
                 const expectedTestPath = calculateExpectedTestPath(matchingSourceByDir, options);
                 if (path.normalize(testFilePath) !== path.normalize(expectedTestPath)) {
+                    // Test file is in the wrong directory
                     return {
                         type: AnalysisErrorType.InvalidDirectoryStructure,
                         message: 'Test file is in wrong directory',
@@ -181,14 +217,21 @@ function validateDirectoryStructure(
                         expectedTestPath: path.join('./tests', path.relative(options.testRoot, expectedTestPath))
                     };
                 }
+                // No error if the subdirectory matches and the test file is in the correct location
                 return null;
             }
+
+            // Convert absolute paths to relative paths for display
+            const relativePaths = matchingSourceFiles.map(file => {
+                const relativePath = path.relative(options.srcRoot, file);
+                return path.join('./src', relativePath);
+            });
 
             return {
                 type: AnalysisErrorType.InvalidDirectoryStructure,
                 message: `Multiple matching source files found (${matchingSourceFiles.length}). Unable to determine correct source file`,
                 sourceFilePath: relativePaths.join(', '),
-                actualTestPath: path.join('./tests', path.relative(options.testRoot, testFilePath))
+                actualTestPath: path.join('./tests', relativeTestPath)
             };
         }
 
