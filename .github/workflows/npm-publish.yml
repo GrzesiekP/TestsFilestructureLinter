@@ -13,17 +13,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
+      - name: Debug - List workspace contents
+        run: |
+          echo "Current directory: $(pwd)"
+          ls -la
+          
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
       
       - name: Install dependencies
-        working-directory: ./cli-tool
         run: npm ci
       
       - name: Build package
-        working-directory: ./cli-tool
         run: npm run build
       
       - name: Upload build artifacts
@@ -31,9 +34,9 @@ jobs:
         with:
           name: dist
           path: |
-            cli-tool/dist
-            cli-tool/package.json
-            cli-tool/package-lock.json
+            dist
+            package.json
+            package-lock.json
   
   publish:
     needs: build
@@ -53,10 +56,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
-          path: cli-tool
+          path: .
       
       - name: Version and publish
-        working-directory: ./cli-tool
         run: |
           # Get the current version
           CURRENT_VERSION=$(node -p "require('./package.json').version")
