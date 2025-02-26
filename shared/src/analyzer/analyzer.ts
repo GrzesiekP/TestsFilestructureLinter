@@ -38,7 +38,8 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
             result.errors.push({
                 type: AnalysisErrorType.InvalidDirectoryStructure,
                 message: `Multiple matching source files found (${matchingSourceFiles.length}). Unable to determine correct source file`,
-                sourceFilePath: matchingSourceFiles.join(', ')
+                sourceFilePath: matchingSourceFiles.join(', '),
+                actualTestPath: path.join('./tests', path.relative(mergedOptions.testRoot, testFile))
             });
         } else {
             const sourcePath = matchingSourceFiles[0];
@@ -186,7 +187,8 @@ function validateDirectoryStructure(
             return {
                 type: AnalysisErrorType.InvalidDirectoryStructure,
                 message: `Multiple matching source files found (${matchingSourceFiles.length}). Unable to determine correct source file`,
-                sourceFilePath: relativePaths.join(', ')
+                sourceFilePath: relativePaths.join(', '),
+                actualTestPath: path.join('./tests', path.relative(options.testRoot, testFilePath))
             };
         }
 
