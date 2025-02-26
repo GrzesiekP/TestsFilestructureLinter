@@ -11,7 +11,9 @@ import {
     DEFAULT_OPTIONS, 
     fixDirectoryStructure, 
     isFixable,
-    AnalysisErrorType 
+    AnalysisErrorType,
+    AnalysisResult,
+    AnalysisError
 } from '@test-filestructure-linter/shared';
 
 const program = new Command();
@@ -75,8 +77,8 @@ program
                     }
                 } else if (options.interactive) {
                     // Interactive mode
-                    const fixableFiles = results.filter(r => 
-                        r.errors.some(e => 
+                    const fixableFiles = results.filter((r: AnalysisResult) => 
+                        r.errors.some((e: AnalysisError) => 
                             e.type === AnalysisErrorType.InvalidDirectoryStructure &&
                             e.actualTestPath &&
                             e.expectedTestPath &&
@@ -106,8 +108,10 @@ program
                                 name: 'files',
                                 message: chalk.cyan('Select files to fix'),
                                 hint: '(Use arrow keys and space to select, enter to confirm)',
-                                choices: currentFiles.map(file => {
-                                    const error = file.errors.find(e => e.type === AnalysisErrorType.InvalidDirectoryStructure);
+                                choices: currentFiles.map((file: AnalysisResult) => {
+                                    const error = file.errors.find((e: AnalysisError) => 
+                                        e.type === AnalysisErrorType.InvalidDirectoryStructure
+                                    );
                                     const currentPath = path.relative(testRoot, file.testFilePath);
                                     const targetPath = error?.expectedTestPath ? 
                                         path.relative(testRoot, error.expectedTestPath) :

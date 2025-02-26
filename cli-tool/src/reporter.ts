@@ -1,7 +1,6 @@
 import chalk from 'chalk';
 import * as cliProgress from 'cli-progress';
 import { ConsoleReporter as SharedConsoleReporter, AnalysisResult, AnalysisErrorType } from '@test-filestructure-linter/shared';
-import * as path from 'path';
 
 /**
  * Console reporter for displaying analysis results in the terminal.
