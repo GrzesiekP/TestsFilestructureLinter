@@ -12,11 +12,9 @@
     "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
-      "@test-filestructure-linter/shared": ["./shared/src"]
     }
   },
   "references": [
-    { "path": "./shared" }
   ],
   "include": ["src/**/*"]
 } 

@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import * as cliProgress from 'cli-progress';
-import { ConsoleReporter as SharedConsoleReporter, AnalysisResult, AnalysisErrorType } from '@test-filestructure-linter/shared';
+import { ConsoleReporter as CoreConsoleReporter, AnalysisResult, AnalysisErrorType } from './core';
 
 /**
  * Console reporter for displaying analysis results in the terminal.
@@ -8,10 +8,10 @@ import { ConsoleReporter as SharedConsoleReporter, AnalysisResult, AnalysisError
  */
 export class ConsoleReporter {
     private readonly progressBar: cliProgress.SingleBar;
-    private readonly sharedReporter: SharedConsoleReporter;
+    private readonly coreReporter: CoreConsoleReporter;
 
     constructor() {
-        this.sharedReporter = new SharedConsoleReporter();
+        this.coreReporter = new CoreConsoleReporter();
         this.progressBar = new cliProgress.SingleBar({
             format: chalk.cyan('Analyzing |') + '{bar}' + chalk.cyan('| {percentage}% || {value}/{total} files'),
             barCompleteChar: '█',
@@ -49,7 +49,7 @@ export class ConsoleReporter {
         if (isInteractive) {
             this.reportFixableFiles(results);
         } else {
-            this.sharedReporter.reportResults(results, totalFiles);
+            this.coreReporter.reportResults(results, totalFiles);
         }
     }
 
