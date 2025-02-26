@@ -16,12 +16,15 @@ import {
     AnalysisError
 } from './core';
 
+// Import package.json for version information
+const packageJson = require('../package.json');
+
 const program = new Command();
 
 program
     .name('test-filestructure-linter')
     .description('CLI tool for analyzing test file structure')
-    .version('0.1.0')
+    .version(packageJson.version)
     .requiredOption('-s, --src-root <path>', 'Source files root directory')
     .requiredOption('-t, --test-root <path>', 'Test files root directory')
     .option('-e, --ext <ext>', 'File extension to analyze', DEFAULT_OPTIONS.fileExtension)
