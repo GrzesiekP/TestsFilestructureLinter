@@ -14,11 +14,12 @@
     "build": "rimraf dist && tsc --project tsconfig.json",
     "clean": "rimraf dist",
     "dev": "ts-node src/index.ts",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:debug": "node --inspect-brk ./node_modules/jest/bin/jest.js --runInBand tests/cli.test.ts",
-    "test:cli": "jest tests/cli.test.ts --verbose",
-    "test:cli:debug": "node --inspect-brk -r ts-node/register ./node_modules/jest/bin/jest.js --runInBand tests/cli.test.ts"
+    "test": "jest --no-coverage",
+    "test:watch": "jest --watch --no-coverage",
+    "test:debug": "node --inspect-brk ./node_modules/jest/bin/jest.js --runInBand --no-coverage tests/cli.test.ts",
+    "test:cli": "jest tests/cli.test.ts --verbose --no-coverage",
+    "test:cli:debug": "node --inspect-brk -r ts-node/register ./node_modules/jest/bin/jest.js --runInBand --no-coverage tests/cli.test.ts",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "chalk": "^4.1.2",
