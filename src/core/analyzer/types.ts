@@ -28,6 +28,8 @@ export interface AnalyzerOptions {
     validateMissingTests: boolean;
     testFileSuffix: string;
     testProjectSuffix: string;
+    ignoreDirectories: string[];
+    ignoreFiles: string[];
 }
 
 export const DEFAULT_OPTIONS: AnalyzerOptions = {
@@ -38,5 +40,7 @@ export const DEFAULT_OPTIONS: AnalyzerOptions = {
     validateDirectoryStructure: true,
     validateMissingTests: true,
     testFileSuffix: 'Tests',
-    testProjectSuffix: '.Tests'
+    testProjectSuffix: '.Tests',
+    ignoreDirectories: ['obj', 'bin'],
+    ignoreFiles: []
 }; 

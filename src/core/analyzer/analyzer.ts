@@ -8,16 +8,25 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
         ...DEFAULT_OPTIONS,
         ...options,
         srcRoot: path.resolve(options.srcRoot || DEFAULT_OPTIONS.srcRoot),
-        testRoot: path.resolve(options.testRoot || DEFAULT_OPTIONS.testRoot)
+        testRoot: path.resolve(options.testRoot || DEFAULT_OPTIONS.testRoot),
+        ignoreDirectories: options.ignoreDirectories || DEFAULT_OPTIONS.ignoreDirectories,
+        ignoreFiles: options.ignoreFiles || DEFAULT_OPTIONS.ignoreFiles
     };
     const results: AnalysisResult[] = [];
     
     const testFiles = await findTestFiles(
         mergedOptions.testRoot,
         mergedOptions.fileExtension,
-        mergedOptions.testFileSuffix
+        mergedOptions.testFileSuffix,
+        mergedOptions.ignoreDirectories,
+        mergedOptions.ignoreFiles
     );
-    const sourceFiles = await findSourceFiles(mergedOptions.srcRoot, mergedOptions.fileExtension);
+    const sourceFiles = await findSourceFiles(
+        mergedOptions.srcRoot, 
+        mergedOptions.fileExtension, 
+        mergedOptions.ignoreDirectories, 
+        mergedOptions.ignoreFiles
+    );
     
     for (const testFile of testFiles) {
         const testFileName = path.basename(testFile, mergedOptions.fileExtension);
@@ -107,10 +116,16 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
     };
 }
 
-async function findTestFiles(dir: string, extension: string, testFileSuffix: string): Promise<string[]> {
+async function findTestFiles(dir: string, extension: string, testFileSuffix: string, ignoreDirectories: string[] = [], ignoreFiles: string[] = []): Promise<string[]> {
     try {
+        // Create glob ignore patterns from ignore directories and files
+        const ignorePatterns = [
+            'node_modules/**',
+            ...ignoreDirectories.map(d => `**/${d}/**`),
+        ];
+
         const files = await new Promise<string[]>((resolve, reject) => {
-            glob(`${dir}/**/*${extension}`, { ignore: 'node_modules/**' }, (err, files) => {
+            glob(`${dir}/**/*${extension}`, { ignore: ignorePatterns }, (err, files) => {
                 if (err) {
                     reject(err);
                     return;
@@ -129,7 +144,17 @@ async function findTestFiles(dir: string, extension: string, testFileSuffix: str
 
                 // Skip directories
                 const stats = fs.statSync(f);
-                return !stats.isDirectory();
+                if (stats.isDirectory()) {
+                    return false;
+                }
+
+                // Skip ignored files
+                const fileName = path.basename(f);
+                if (ignoreFiles.some(ignoredFile => ignoredFile === fileName)) {
+                    return false;
+                }
+
+                return true;
             });
     } catch (error) {
         console.error('Error finding test files:', error);
@@ -137,10 +162,16 @@ async function findTestFiles(dir: string, extension: string, testFileSuffix: str
     }
 }
 
-async function findSourceFiles(dir: string, extension: string): Promise<string[]> {
+async function findSourceFiles(dir: string, extension: string, ignoreDirectories: string[] = [], ignoreFiles: string[] = []): Promise<string[]> {
     try {
+        // Create glob ignore patterns from ignore directories and files
+        const ignorePatterns = [
+            'node_modules/**',
+            ...ignoreDirectories.map(d => `**/${d}/**`),
+        ];
+
         const files = await new Promise<string[]>((resolve, reject) => {
-            glob(`${dir}/**/*${extension}`, { ignore: 'node_modules/**' }, (err, files) => {
+            glob(`${dir}/**/*${extension}`, { ignore: ignorePatterns }, (err, files) => {
                 if (err) {
                     reject(err);
                     return;
@@ -149,10 +180,28 @@ async function findSourceFiles(dir: string, extension: string): Promise<string[]
             });
         });
 
-        return files.map((f: string) => {
-            const resolvedPath = path.resolve(f);
-            return resolvedPath;
-        });
+        return files
+            .map((f: string) => path.resolve(f))
+            .filter((f: string) => {
+                // Skip non-existing files
+                if (!fs.existsSync(f)) {
+                    return false;
+                }
+
+                // Skip directories
+                const stats = fs.statSync(f);
+                if (stats.isDirectory()) {
+                    return false;
+                }
+
+                // Skip ignored files
+                const fileName = path.basename(f);
+                if (ignoreFiles.some(ignoredFile => ignoredFile === fileName)) {
+                    return false;
+                }
+
+                return true;
+            });
     } catch (error) {
         console.error('Error finding source files:', error);
         return [];
