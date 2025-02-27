@@ -19,7 +19,8 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
         mergedOptions.fileExtension,
         mergedOptions.testFileSuffix,
         mergedOptions.ignoreDirectories,
-        mergedOptions.ignoreFiles
+        mergedOptions.ignoreFiles,
+        mergedOptions.testProjectSuffix
     );
     const sourceFiles = await findSourceFiles(
         mergedOptions.srcRoot, 
@@ -116,7 +117,7 @@ export async function analyzeProject(options: Partial<AnalyzerOptions> = {}): Pr
     };
 }
 
-async function findTestFiles(dir: string, extension: string, testFileSuffix: string, ignoreDirectories: string[] = [], ignoreFiles: string[] = []): Promise<string[]> {
+async function findTestFiles(dir: string, extension: string, testFileSuffix: string, ignoreDirectories: string[] = [], ignoreFiles: string[] = [], testProjectSuffix: string = '.Tests'): Promise<string[]> {
     try {
         // Create glob ignore patterns from ignore directories and files
         const ignorePatterns = [
@@ -152,6 +153,32 @@ async function findTestFiles(dir: string, extension: string, testFileSuffix: str
                 const fileName = path.basename(f);
                 if (ignoreFiles.some(ignoredFile => ignoredFile === fileName)) {
                     return false;
+                }
+
+                // Skip files that don't have the test suffix in their filename
+                const fileNameWithoutExt = path.basename(fileName, extension);
+                if (!fileNameWithoutExt.endsWith(testFileSuffix)) {
+                    return false;
+                }
+
+                // Get the path relative to the test root
+                const relativePath = path.relative(dir, f);
+                const pathSegments = relativePath.split(/[\/\\]/);
+                
+                // Only include files from projects with the exact test project suffix
+                if (pathSegments.length > 0) {
+                    const projectName = pathSegments[0];
+                    // Check if the project name ends with the exact test project suffix
+                    // Not just any project containing "Tests" in the name
+                    if (!projectName.endsWith(testProjectSuffix)) {
+                        return false;
+                    }
+                    
+                    // Additional check to exclude Tests.* projects that aren't proper test projects
+                    // e.g., Tests.Helpers
+                    if (projectName.startsWith('Tests.')) {
+                        return false;
+                    }
                 }
 
                 return true;
