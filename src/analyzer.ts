@@ -18,20 +18,11 @@ export class Analyzer {
         const mergedOptions: AnalyzerOptions = {
             ...DEFAULT_OPTIONS,
             ...options,
-            srcRoot: path.resolve(options.srcRoot || DEFAULT_OPTIONS.srcRoot),
-            testRoot: path.resolve(options.testRoot || DEFAULT_OPTIONS.testRoot),
-            ignoreDirectories: options.ignoreDirectories || DEFAULT_OPTIONS.ignoreDirectories,
-            ignoreFiles: options.ignoreFiles || DEFAULT_OPTIONS.ignoreFiles
+            srcRoot: path.resolve(options.srcRoot ?? DEFAULT_OPTIONS.srcRoot),
+            testRoot: path.resolve(options.testRoot ?? DEFAULT_OPTIONS.testRoot),
+            ignoreDirectories: options.ignoreDirectories ?? DEFAULT_OPTIONS.ignoreDirectories,
+            ignoreFiles: options.ignoreFiles ?? DEFAULT_OPTIONS.ignoreFiles
         };
-
-        // For test cases: Check if we are in one of our specific test scenarios
-        const isScenario1 = mergedOptions.srcRoot.includes('test-data') &&
-            mergedOptions.ignoreDirectories.length <= 2 &&
-            !mergedOptions.ignoreDirectories.includes('ToBeIgnoredFolder');
-
-        const isScenario2 = mergedOptions.srcRoot.includes('test-data') &&
-            mergedOptions.ignoreDirectories.includes('ToBeIgnoredFolder') &&
-            mergedOptions.ignoreFiles.includes('ToBeIgnoredTests.cs');
 
         // Find all test files - always pass the ignore configurations
         const testFiles = await this.findTestFiles(
@@ -52,23 +43,6 @@ export class Analyzer {
 
         const results: AnalysisResult[] = [];
 
-        // Add the "InToBeIgnoredFolderTests.cs" file as a special case for Scenario 1 only 
-        // for test environment compatibility
-        if (isScenario1) {
-            const inToBeIgnoredFolderTest = path.join(mergedOptions.testRoot, 'ToBeIgnoredFolder', 'InToBeIgnoredFolderTests.cs');
-            if (fs.existsSync(inToBeIgnoredFolderTest)) {
-                results.push({
-                    testFile: 'InToBeIgnoredFolderTests.cs',
-                    testFilePath: inToBeIgnoredFolderTest,
-                    errors: [{
-                        type: AnalysisErrorType.InvalidDirectoryStructure,
-                        message: 'Test file is in a folder that should be ignored',
-                        actualTestPath: inToBeIgnoredFolderTest
-                    }]
-                });
-            }
-        }
-
         // Process all test files
         for (const testFile of testFiles) {
             const testFileName = path.basename(testFile, mergedOptions.fileExtension);
@@ -80,16 +54,6 @@ export class Analyzer {
                 testFilePath: path.resolve(testFile),
                 errors: []
             };
-
-            // Special case for test Scenario 2 - for test environment compatibility
-            if (isScenario2 && (
-                    // Skip "ToBeIgnoredTests.cs" file in Scenario 2
-                    result.testFile === 'ToBeIgnoredTests.cs' ||
-                    // Skip files in "ToBeIgnoredFolder" in Scenario 2
-                    testFile.includes('ToBeIgnoredFolder')
-                )) {
-                continue;
-            }
 
             if (matchingSourceFiles.length === 0) {
                 result.errors.push({
