@@ -1,6 +1,6 @@
 {
   "name": "test-filestructure-linter-cli",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "CLI tool for test filetructure linting",
   "author": {
     "name": "Grzegorz Pawłowski",
