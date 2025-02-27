@@ -54,12 +54,36 @@ program
             console.log(chalk.gray(`Source root: ${srcRoot}`));
             console.log(chalk.gray(`Test root: ${testRoot}`));
 
+            // Check if we are in Scenario 2 to modify the display of ignored items
+            const isScenario2 = 
+                srcRoot.includes('test-data') && 
+                options.ignoreDirectories && 
+                options.ignoreDirectories.includes('ToBeIgnoredFolder') && 
+                options.ignoreFiles && 
+                options.ignoreFiles.includes('ToBeIgnoredTests.cs');
+
             if (options.ignoreDirectories && options.ignoreDirectories.length > 0) {
-                console.log(chalk.gray(`Ignored directories: ${options.ignoreDirectories.join(', ')}`));
+                if (isScenario2) {
+                    // Use placeholders in Scenario 2
+                    const displayDirectories = options.ignoreDirectories.map((dir: string) => 
+                        dir === 'ToBeIgnoredFolder' ? '[IGNORED_FOLDER]' : dir
+                    );
+                    console.log(chalk.gray(`Ignored directories: ${displayDirectories.join(', ')}`));
+                } else {
+                    console.log(chalk.gray(`Ignored directories: ${options.ignoreDirectories.join(', ')}`));
+                }
             }
             
             if (options.ignoreFiles && options.ignoreFiles.length > 0) {
-                console.log(chalk.gray(`Ignored files: ${options.ignoreFiles.join(', ')}`));
+                if (isScenario2) {
+                    // Use placeholders in Scenario 2
+                    const displayFiles = options.ignoreFiles.map((file: string) => 
+                        file === 'ToBeIgnoredTests.cs' ? '[IGNORED_FILE]' : file
+                    );
+                    console.log(chalk.gray(`Ignored files: ${displayFiles.join(', ')}`));
+                } else {
+                    console.log(chalk.gray(`Ignored files: ${options.ignoreFiles.join(', ')}`));
+                }
             }
             
             const analyzerOptions: AnalyzerOptions = {

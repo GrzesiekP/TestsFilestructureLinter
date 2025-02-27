@@ -3,6 +3,7 @@ export interface AnalysisResult {
     testFilePath: string;
     testRoot?: string;
     errors: AnalysisError[];
+    isIgnored?: boolean;
 }
 
 export interface AnalysisError {
