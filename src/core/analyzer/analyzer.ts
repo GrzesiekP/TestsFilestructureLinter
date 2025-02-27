@@ -135,6 +135,9 @@ async function findTestFiles(dir: string, extension: string, testFileSuffix: str
             });
         });
 
+        // Normalize the ignored files list for easier comparison
+        const normalizedIgnoreFiles = ignoreFiles.map(f => f.toLowerCase());
+
         return files
             .map((f: string) => path.resolve(f))
             .filter((f: string) => {
@@ -149,9 +152,9 @@ async function findTestFiles(dir: string, extension: string, testFileSuffix: str
                     return false;
                 }
 
-                // Skip ignored files
+                // Skip ignored files - case insensitive comparison
                 const fileName = path.basename(f);
-                if (ignoreFiles.some(ignoredFile => ignoredFile === fileName)) {
+                if (normalizedIgnoreFiles.includes(fileName.toLowerCase())) {
                     return false;
                 }
 
@@ -207,6 +210,9 @@ async function findSourceFiles(dir: string, extension: string, ignoreDirectories
             });
         });
 
+        // Normalize the ignored files list for easier comparison
+        const normalizedIgnoreFiles = ignoreFiles.map(f => f.toLowerCase());
+
         return files
             .map((f: string) => path.resolve(f))
             .filter((f: string) => {
@@ -221,9 +227,9 @@ async function findSourceFiles(dir: string, extension: string, ignoreDirectories
                     return false;
                 }
 
-                // Skip ignored files
+                // Skip ignored files - case insensitive comparison
                 const fileName = path.basename(f);
-                if (ignoreFiles.some(ignoredFile => ignoredFile === fileName)) {
+                if (normalizedIgnoreFiles.includes(fileName.toLowerCase())) {
                     return false;
                 }
 
