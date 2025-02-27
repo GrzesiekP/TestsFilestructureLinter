@@ -18,6 +18,7 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      - run: npm run build
       - run: npm test
 
   publish-npm:
@@ -30,27 +31,6 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org/
       - run: npm install
-      
-      # Add version bump step
-      - name: Bump patch version
-        run: |
-          # Get current version
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          echo "Current version: $CURRENT_VERSION"
-          
-          # Split version into major.minor.patch
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-          
-          # Increment the patch version
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          echo "New version: $NEW_VERSION"
-          
-          # Update package.json with new version
-          npm version $NEW_VERSION --no-git-tag-version
-          
-          echo "Updated package.json to version $NEW_VERSION"
-      
-      - run: npm publish
+      - run: npm run publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
