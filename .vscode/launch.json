@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug CLI Test",
+      "program": "${workspaceFolder}/node_modules/jest/bin/jest",
+      "args": [
+        "--config",
+        "${workspaceFolder}/jest.config.js",
+        "--testMatch",
+        "**/tests/**/*.test.ts",
+        "--runInBand",
+        "tests/cli.test.ts"
+      ],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "disableOptimisticBPs": true
+    }
+  ]
+} 
