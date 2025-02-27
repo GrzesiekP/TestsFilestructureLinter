@@ -101,17 +101,20 @@ export class Analyzer {
                 const relativeTestPath = path.relative(mergedOptions.testRoot, testFile);
                 const testDirPath = path.dirname(relativeTestPath);
                 const testDirSegments = testDirPath.split(/[\/\\]/);
-                const lastTestDirSegment = testDirSegments[testDirSegments.length - 1];
+                const testProjectDirSegment = testDirSegments[0];
+                const testPathAfterProjectDir = testDirSegments.slice(1).join(path.sep);
 
                 // Try to find a source file with matching directory structure
                 let matchingSourceByDir = matchingSourceFiles.find(file => {
                     const relativeSourcePath = path.relative(mergedOptions.srcRoot, file);
                     const sourceDirPath = path.dirname(relativeSourcePath);
                     const sourceDirSegments = sourceDirPath.split(/[\/\\]/);
-                    const lastSourceDirSegment = sourceDirSegments[sourceDirSegments.length - 1];
-
-                    return lastSourceDirSegment && lastTestDirSegment &&
-                        lastSourceDirSegment.toLowerCase() === lastTestDirSegment.toLowerCase();
+                    const sourceProjectDirSegment = sourceDirSegments[0];
+                    const sourcePathAfterProjectDir = sourceDirSegments.slice(1).join(path.sep);
+                    
+                    const isMatching = sourceProjectDirSegment === testProjectDirSegment.replace(mergedOptions.testProjectSuffix, '') &&
+                            sourcePathAfterProjectDir === testPathAfterProjectDir;
+                    return isMatching;
                 });
 
                 if (matchingSourceByDir) {
