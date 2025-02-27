@@ -31,6 +31,10 @@ Fix modes:
   -f, --fix <path>               Fix a specific test file
   -i, --interactive              Interactive mode - select files to fix
 
+Filtering:
+  --ignore-directories <list>     Comma-separated list of directories to ignore
+  --ignore-files <list>           Comma-separated list of files to ignore
+
 Other options:
   -e, --ext <ext>                File extension to analyze (default: ".cs")
   --test-suffix <suffix>          Test file suffix (default: "Tests")
@@ -64,6 +68,9 @@ test-filestructure-linter -s ./src -t ./tests -d -i
 
 # Custom file extension and suffixes
 test-filestructure-linter -s ./src -t ./tests -e .vb --test-suffix Spec --test-project-suffix .Specs
+
+# Ignore specific directories and files
+test-filestructure-linter -s ./src -t ./tests -d --ignore-directories bin,obj,IntegrationTests --ignore-files AssemblyInfo.cs,Startup.cs
 
 # Using relative or absolute paths
 test-filestructure-linter -s ../../MyProject/src -t ../../MyProject/tests
@@ -113,6 +120,26 @@ When enabled with `-m` or `--missing`, checks for:
   - ✨ Expected test file paths
 - Allows selecting multiple files using checkboxes
 - Shows fix operation results
+
+## Filtering Options
+
+### Ignore Directories
+```bash
+--ignore-directories <directories>
+```
+- Comma-separated list of directory names to exclude from analysis
+- Directories at any level with these names will be skipped
+- Useful for excluding build outputs, integration test projects, etc.
+- Example: `--ignore-directories bin,obj,IntegrationTests`
+
+### Ignore Files
+```bash
+--ignore-files <files>
+```
+- Comma-separated list of file names to exclude from analysis
+- Files with these names will be skipped regardless of location
+- Useful for excluding generated files, specific test cases, etc.
+- Example: `--ignore-files AssemblyInfo.cs,GlobalSetup.cs`
 
 ## Notes
 - Source and test root paths are required
