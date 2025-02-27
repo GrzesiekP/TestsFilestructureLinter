@@ -3,18 +3,11 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import * as path from 'path';
+import { AnalysisError, AnalysisErrorType, AnalysisResult, AnalyzerOptions, DEFAULT_OPTIONS } from './types';
+import { ConsoleReporter } from './console-reporter';
+import { Analyzer } from './analyzer';
+import { Fixer } from './fixer';
 const { MultiSelect } = require('enquirer');
-import { 
-    analyzeProject, 
-    ConsoleReporter, 
-    AnalyzerOptions, 
-    DEFAULT_OPTIONS, 
-    fixDirectoryStructure, 
-    isFixable,
-    AnalysisErrorType,
-    AnalysisResult,
-    AnalysisError
-} from './core';
 
 // Import package.json for version information
 const packageJson = require('../package.json');
@@ -104,14 +97,16 @@ program
             };
             
             console.log(chalk.cyan('\nAnalyzing test structure...'));
-            const { results, totalFiles } = await analyzeProject(analyzerOptions);
+            const analyzer = new Analyzer();
+            const fixer = new Fixer();
+            const { results, totalFiles } = await analyzer.analyzeProject(analyzerOptions);
             reporter.reportResults(results, totalFiles, options.interactive);
 
             if (results.length > 0) {
                 if (options.fix) {
                     // Fix specific file
                     const testPath = path.resolve(options.fix);
-                    const fixable = await isFixable(testPath, results);
+                    const fixable = await fixer.isFixable(testPath, results);
                     
                     if (fixable.isFixable && fixable.fix) {
                         console.log(chalk.cyan('\nFixing file...'));
@@ -212,7 +207,7 @@ program
                     let fixedCount = 0;
                     
                     for (const testPath of selectedPaths) {
-                        const fixable = await isFixable(testPath, results);
+                        const fixable = await fixer.isFixable(testPath, results);
                         if (fixable.isFixable && fixable.fix) {
                             try {
                                 const result = await fixable.fix();
@@ -230,7 +225,7 @@ program
                     }
                 } else if (options.all) {
                     console.log(chalk.cyan('\nFixing directory structure issues...'));
-                    const fixedFiles = await fixDirectoryStructure(results, analyzerOptions);
+                    const fixedFiles = await fixer.fixDirectoryStructure(results, analyzerOptions);
                     if (fixedFiles.length > 0) {
                         console.log(chalk.green(`\n✓ Fixed ${fixedFiles.length} files:`));
                         for (const { from, to } of fixedFiles) {
