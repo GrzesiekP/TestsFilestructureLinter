@@ -33,7 +33,11 @@ program
     .option('-m, --missing', 'Enable validation of missing test files')
     .option('--test-suffix <suffix>', 'Test file suffix', DEFAULT_OPTIONS.testFileSuffix)
     .option('--test-project-suffix <suffix>', 'Test project suffix', DEFAULT_OPTIONS.testProjectSuffix)
-    .option('--ignore-directories <directories>', 'Comma-separated list of directories to ignore', (val) => val ? val.split(',').map(s => s.trim()) : DEFAULT_OPTIONS.ignoreDirectories)
+    .option('--ignore-directories <directories>', 'Comma-separated list of directories to ignore', (val) => {
+        if (!val) return DEFAULT_OPTIONS.ignoreDirectories;
+        // Handle quoted values properly by replacing quotes and splitting by comma
+        return val.replace(/["']/g, '').split(',').map(s => s.trim()).filter(Boolean);
+    })
     .option('--ignore-files <files>', 'Comma-separated list of files to ignore', (val) => {
         if (!val) return DEFAULT_OPTIONS.ignoreFiles;
         // Handle quoted values properly by replacing quotes and splitting by comma
