@@ -1,6 +1,6 @@
 {
   "name": "test-filestructure-linter-cli",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "CLI tool for test filetructure linting",
   "author": {
     "name": "Grzegorz Pawłowski",
@@ -14,8 +14,7 @@
     "build": "rimraf dist && tsc --project tsconfig.json",
     "clean": "rimraf dist",
     "dev": "ts-node src/index.ts",
-    "test": "echo \"No tests specified yet\" && exit 0",
-    "publish": "npm install && npm run build && npm publish"
+    "test": "echo \"No tests specified yet\" && exit 0"
   },
   "dependencies": {
     "chalk": "^4.1.2",
