@@ -1,6 +1,6 @@
 {
   "name": "test-filestructure-linter-cli",
-  "version": "0.2.1-alpha.1",
+  "version": "0.2.1-alpha.2",
   "description": "CLI tool for test filetructure linting",
   "author": {
     "name": "Grzegorz Pawłowski",
@@ -19,7 +19,11 @@
     "test:debug": "node --inspect-brk ./node_modules/jest/bin/jest.js --runInBand --no-coverage tests/cli.test.ts",
     "test:cli": "jest tests/cli.test.ts --verbose --no-coverage",
     "test:cli:debug": "node --inspect-brk -r ts-node/register ./node_modules/jest/bin/jest.js --runInBand --no-coverage tests/cli.test.ts",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\""
   },
   "dependencies": {
     "chalk": "^4.1.2",
@@ -36,7 +40,12 @@
     "@types/glob": "^8.1.0",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.11.17",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-prettier": "^5.2.3",
     "jest": "^29.7.0",
+    "prettier": "^3.5.2",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"

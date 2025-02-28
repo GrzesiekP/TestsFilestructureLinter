@@ -1,47 +1,47 @@
 export interface AnalysisResult {
-    testFile: string;
-    testFilePath: string;
-    testRoot?: string;
-    errors: AnalysisError[];
-    isIgnored?: boolean;
+  testFile: string;
+  testFilePath: string;
+  testRoot?: string;
+  errors: AnalysisError[];
+  isIgnored?: boolean;
 }
 
 export interface AnalysisError {
-    type: AnalysisErrorType;
-    message: string;
-    sourceFilePath?: string;
-    actualTestPath?: string;
-    expectedTestPath?: string;
+  type: AnalysisErrorType;
+  message: string;
+  sourceFilePath?: string;
+  actualTestPath?: string;
+  expectedTestPath?: string;
 }
 
 export enum AnalysisErrorType {
-    InvalidFileName = 'Invalid File Name',
-    InvalidDirectoryStructure = 'Invalid Directory Structure',
-    MissingTest = 'Missing Test File'
+  InvalidFileName = 'Invalid File Name',
+  InvalidDirectoryStructure = 'Invalid Directory Structure',
+  MissingTest = 'Missing Test File',
 }
 
 export interface AnalyzerOptions {
-    srcRoot: string;
-    testRoot: string;
-    fileExtension: string;
-    validateFileName: boolean;
-    validateDirectoryStructure: boolean;
-    validateMissingTests: boolean;
-    testFileSuffix: string;
-    testProjectSuffix: string;
-    ignoreDirectories: string[];
-    ignoreFiles: string[];
+  srcRoot: string;
+  testRoot: string;
+  fileExtension: string;
+  validateFileName: boolean;
+  validateDirectoryStructure: boolean;
+  validateMissingTests: boolean;
+  testFileSuffix: string;
+  testProjectSuffix: string;
+  ignoreDirectories: string[];
+  ignoreFiles: string[];
 }
 
 export const DEFAULT_OPTIONS: AnalyzerOptions = {
-    srcRoot: 'src',
-    testRoot: 'tests',
-    fileExtension: '.cs',
-    validateFileName: true,
-    validateDirectoryStructure: true,
-    validateMissingTests: true,
-    testFileSuffix: 'Tests',
-    testProjectSuffix: '.Tests',
-    ignoreDirectories: ['obj', 'bin'],
-    ignoreFiles: []
-}; 
+  srcRoot: 'src',
+  testRoot: 'tests',
+  fileExtension: '.cs',
+  validateFileName: true,
+  validateDirectoryStructure: true,
+  validateMissingTests: true,
+  testFileSuffix: 'Tests',
+  testProjectSuffix: '.Tests',
+  ignoreDirectories: ['obj', 'bin'],
+  ignoreFiles: [],
+};
