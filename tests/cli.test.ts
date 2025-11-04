@@ -1,10 +1,10 @@
 import {
     exec
-} from 'child_process';
+} from 'node:child_process';
 import {
     promisify
-} from 'util';
-import fs from 'fs';
+} from 'node:util';
+import fs from 'node:fs';
 
 const execAsync = promisify(exec);
 
@@ -48,7 +48,106 @@ describe('CLI Tool Tests', () => {
         }
     };
 
-    describe('Scenario 1: Default options', () => {
+    // Common tests that run for both scenarios
+    describe('Common validation tests', () => {
+        // Store results for both scenarios
+        const scenarios = [
+            {
+                name: 'Default options',
+                args: '-s ./test-data/src/ -t ./test-data/tests/ -d -n',
+                jsonOutput: null as any
+            },
+            {
+                name: 'With ignore options',
+                args: '-s ./test-data/src/ -t ./test-data/tests/ -d -n --ignore-directories "ToBeIgnoredFolder","obj" --ignore-files "ToBeIgnoredTests.cs","OtherIgnoreTests.cs"',
+                jsonOutput: null as any
+            }
+        ];
+
+        beforeAll(async () => {
+            // Run both scenarios and store results
+            for (const scenario of scenarios) {
+                const result = await executeCLI(scenario.args);
+                scenario.jsonOutput = result.jsonOutput;
+            }
+        });
+
+        test.each(scenarios)('$name: should not contain issue with for files outside source code', ({ jsonOutput }) => {
+            const hasNormalizedPathContaining = (path: string) => {
+                const allPathsNormalized = jsonOutput.filesWithIssues.map((issue: any) => issue.currentTestFile?.replaceAll('\\', '/'));
+                return allPathsNormalized.some((p: string) => p && p.includes(path));
+            };
+            const hasPath = hasNormalizedPathContaining('tests/obj/Debug/net8.0/Application.Tests/CalcTests.cs');
+            expect(hasPath).toBe(false);
+        });
+
+        test.each(scenarios)('$name: should not contain issue with Helper1.cs because it is not test file', ({ jsonOutput }) => {
+            const hasIssue = (fileName: string) => 
+                jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('Helper1.cs')).toBe(false);
+        });
+
+        test.each(scenarios)('$name: should not contain issue with FooIntegrationTest.cs because it is integration test with different structure', ({ jsonOutput }) => {
+            const hasIssue = (fileName: string) => 
+                jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('FooIntegrationTest.cs')).toBe(false);
+        });
+
+        test.each(scenarios)('$name: should not contain issue with FooHelper because it is not test file', ({ jsonOutput }) => {
+            const hasIssue = (fileName: string) => 
+                jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('FooHelper')).toBe(false);
+        });
+
+        test.each(scenarios)('$name: should not contain issue with Application.Tests.AssemblyInfo because it is not test file', ({ jsonOutput }) => {
+            const hasIssue = (fileName: string) => 
+                jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('Application.Tests.AssemblyInfo')).toBe(false);
+        });
+
+        test.each(scenarios)('$name: should not contain issue with Bus/HandlerTests.cs, Car/HandlerTests.cs, Truck/HandlerTests.cs because they are different tests despite the same name', ({ jsonOutput }) => {
+            const hasNormalizedPathContaining = (path: string) => {
+                const allPathsNormalized = jsonOutput.filesWithIssues.map((issue: any) => issue.currentTestFile?.replaceAll('\\', '/'));
+                return allPathsNormalized.some((p: string) => p && p.includes(path));
+            };
+            expect(hasNormalizedPathContaining('Bus/HandlerTests.cs')).toBe(false);
+            expect(hasNormalizedPathContaining('Car/HandlerTests.cs')).toBe(false);
+            expect(hasNormalizedPathContaining('Truck/HandlerTests.cs')).toBe(false);
+        });
+
+        test.each(scenarios)('$name: should contain issue with CalcTests.cs because it is true positive issue', ({ jsonOutput }) => {
+            const hasIssue = (fileName: string) => 
+                jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('CalcTests.cs')).toBe(true);
+        });
+
+        test.each(scenarios)('$name: should contain issue with UserServiceTests.cs because it is true positive issue', ({ jsonOutput }) => {
+            const hasIssue = (fileName: string) => 
+                jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('UserServiceTests.cs')).toBe(true);
+        });
+
+        test.each(scenarios)('$name: should contain issue with UserMapperTests.cs because it is true positive issue', ({ jsonOutput }) => {
+            const hasIssue = (fileName: string) => 
+                jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('UserMapperTests.cs')).toBe(true);
+        });
+
+        test.each(scenarios)('$name: should contain issue with WrongNameTests.cs because it is true positive issue', ({ jsonOutput }) => {
+            const hasIssue = (fileName: string) => 
+                jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('WrongNameTests.cs')).toBe(true);
+        });
+
+        test.each(scenarios)('$name: should contain issue with ProductMapperTests.cs because it is true positive issue', ({ jsonOutput }) => {
+            const hasIssue = (fileName: string) => 
+                jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('ProductMapperTests.cs')).toBe(true);
+        });
+    });
+
+    // Scenario 1 specific tests
+    describe('Scenario 1: Default options - specific validations', () => {
         let jsonOutput: any;
 
         beforeAll(async () => {
@@ -59,11 +158,6 @@ describe('CLI Tool Tests', () => {
         const hasIssue = (fileName: string) => 
             jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
 
-        const hasNormalizedPathContaining = (path: string) => {
-            const allPathsNormalized = jsonOutput.filesWithIssues.map((issue: any) => issue.currentTestFile?.replace(/\\/g, '/'));
-            return allPathsNormalized.some((p: string) => p && p.includes(path));
-        };
-
         it('should have 7 issues in summary', () => {
             expect(jsonOutput.summary.totalFilesWithIssues).toBe(7);
         });
@@ -72,120 +166,25 @@ describe('CLI Tool Tests', () => {
             expect(jsonOutput.filesWithIssues.length).toBe(7);
         });
 
-        it('should not contain issue with for files outside source code', () => {
-            const hasPath = hasNormalizedPathContaining('tests/obj/Debug/net8.0/Application.Tests/CalcTests.cs');
-            expect(hasPath).toBe(false);
-        });
-
-        it('should not contain issue with Helper1.cs because it is not test file', () => {
-            expect(hasIssue('Helper1.cs')).toBe(false);
-        });
-
-        it('should not contain issue with FooIntegrationTest.cs because it is integration test with different structure', () => {
-            expect(hasIssue('FooIntegrationTest.cs')).toBe(false);
-        });
-
-        it('should not contain issue with FooHelper because it is not test file', () => {
-            expect(hasIssue('FooHelper')).toBe(false);
-        });
-
-        it('should not contain issue with Application.Tests.AssemblyInfo because it is not test file', () => {
-            expect(hasIssue('Application.Tests.AssemblyInfo')).toBe(false);
-        });
-
-        it('should not contain issue with Bus/HandlerTests.cs, Car/HandlerTests.cs, Truck/HandlerTests.cs because they are different tests despite the same name', () => {
-            expect(hasNormalizedPathContaining('Bus/HandlerTests.cs')).toBe(false);
-            expect(hasNormalizedPathContaining('Car/HandlerTests.cs')).toBe(false);
-            expect(hasNormalizedPathContaining('Truck/HandlerTests.cs')).toBe(false);
-        });
-
-        it('should contain issue with CalcTests.cs because it is true positive issue', () => {
-            expect(hasIssue('CalcTests.cs')).toBe(true);
-        });
-
-        it('should contain issue with UserServiceTests.cs because it is true positive issue', () => {
-            expect(hasIssue('UserServiceTests.cs')).toBe(true);
-        });
-
-        it('should contain issue with UserMapperTests.cs because it is true positive issue', () => {
-            expect(hasIssue('UserMapperTests.cs')).toBe(true);
-        });
-
-        it('should contain issue with WrongNameTests.cs because it is true positive issue', () => {
-            expect(hasIssue('WrongNameTests.cs')).toBe(true);
-        });
-
-        it('should contain issue with ProductMapperTests.cs because it is true positive issue', () => {
-            expect(hasIssue('ProductMapperTests.cs')).toBe(true);
-        });
-
         it('should contain issue with ToBeIgnoredTests.cs because it is in the ignore list', () => {
             expect(hasIssue('ToBeIgnoredTests.cs')).toBe(true);
         });
 
-        it('should contain issue with InToBeIgnoredFolderTests.cs because it is in the ignore list', () => {
+        it('should not contain issue with InToBeIgnoredFolderTests.cs', () => {
             expect(hasIssue('InToBeIgnoredFolderTests.cs')).toBe(false);
         });
     });
 
-    describe('Scenario 2: With ignore options', () => {
+    describe('Scenario 2: With ignore options - specific validations', () => {
         let jsonOutput: any;
 
         beforeAll(async () => {
             const result = await executeCLI('-s ./test-data/src/ -t ./test-data/tests/ -d -n --ignore-directories "ToBeIgnoredFolder","obj" --ignore-files "ToBeIgnoredTests.cs","OtherIgnoreTests.cs"');
             jsonOutput = result.jsonOutput;
         });
-        const hasNormalizedPathContaining = (path: string) => {
-            const allPathsNormalized = jsonOutput.filesWithIssues.map((issue: any) => issue.currentTestFile?.replace(/\\/g, '/'));
-            return allPathsNormalized.some((p: string) => p && p.includes(path));
-        };
 
         const hasIssue = (fileName: string) => 
             jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
-
-        it('should not contain issue with for files outside source code', () => {
-            const hasPath = hasNormalizedPathContaining('tests/obj/Debug/net8.0/Application.Tests/CalcTests.cs');
-            expect(hasPath).toBe(false);
-        });
-
-        it('should not contain issue with Helper1.cs because it is not test file', () => {
-            expect(hasIssue('Helper1.cs')).toBe(false);
-        });
-
-        it('should not contain issue with FooIntegrationTest.cs because it is integration test with different structure', () => {
-            expect(hasIssue('FooIntegrationTest.cs')).toBe(false);
-        });
-
-        it('should not contain issue with FooHelper because it is not test file', () => {
-            expect(hasIssue('FooHelper')).toBe(false);
-        });
-
-        it('should not contain issue with Application.Tests.AssemblyInfo because it is not test file', () => {
-            expect(hasIssue('Application.Tests.AssemblyInfo')).toBe(false);
-        });
-
-        it('should not contain issue with Bus/HandlerTests.cs, Car/HandlerTests.cs, Truck/HandlerTests.cs because they are different tests despite the same name', () => {
-            expect(hasNormalizedPathContaining('Bus/HandlerTests.cs')).toBe(false);
-            expect(hasNormalizedPathContaining('Car/HandlerTests.cs')).toBe(false);
-            expect(hasNormalizedPathContaining('Truck/HandlerTests.cs')).toBe(false);
-        });
-
-        it('should contain issue with CalcTests.cs because it is true positive issue', () => {
-            expect(hasIssue('CalcTests.cs')).toBe(true);
-        });
-
-        it('should contain issue with UserServiceTests.cs because it is true positive issue', () => {
-            expect(hasIssue('UserServiceTests.cs')).toBe(true);
-        });
-
-
-        it('should contain issue with UserMapperTests.cs because it is true positive issue', () => {
-            expect(hasIssue('UserMapperTests.cs')).toBe(true);
-        });
-
-        it('should contain issue with WrongNameTests.cs because it is true positive issue', () => {
-            expect(hasIssue('WrongNameTests.cs')).toBe(true);
-        });
 
         it('should not contain issue with "ToBeIgnoredTests.cs" because it is in the ignore list', () => {
             expect(hasIssue('ToBeIgnoredTests.cs')).toBe(false);
