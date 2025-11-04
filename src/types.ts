@@ -43,5 +43,5 @@ export const DEFAULT_OPTIONS: AnalyzerOptions = {
   testFileSuffix: 'Tests',
   testProjectSuffix: '.Tests',
   ignoreDirectories: ['obj', 'bin'],
-  ignoreFiles: [],
+  ignoreFiles: []
 };
