@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import * as path from 'path';
+import * as fs from 'fs';
 import {
   AnalysisError,
   AnalysisErrorType,
@@ -13,6 +14,7 @@ import {
 import { ConsoleReporter } from './console-reporter';
 import { Analyzer } from './analyzer';
 import { Fixer } from './fixer';
+import { generateJsonReport } from './json-reporter';
 const { MultiSelect } = require('enquirer');
 
 // Import package.json for version information
@@ -58,6 +60,7 @@ program
       .map((s) => s.trim())
       .filter(Boolean);
   })
+  .option('-o, --output <path>', 'Output JSON report to file')
   .option('-a, --all', 'Fix all directory structure issues by moving files')
   .option('-f, --fix <path>', 'Fix a specific test file')
   .option('-i, --interactive', 'Interactive mode - select files to fix')
@@ -73,13 +76,6 @@ program
       console.log(chalk.gray(`Source root: ${srcRoot}`));
       console.log(chalk.gray(`Test root: ${testRoot}`));
 
-      if (options.ignoreDirectories && options.ignoreDirectories.length > 0) {
-        console.log(chalk.gray(`Ignored directories: ${options.ignoreDirectories.join(', ')}`));
-      }
-
-      if (options.ignoreFiles && options.ignoreFiles.length > 0) {
-        console.log(chalk.gray(`Ignored files: ${options.ignoreFiles.join(', ')}`));
-      }
 
       const analyzerOptions: AnalyzerOptions = {
         srcRoot,
@@ -99,6 +95,44 @@ program
       const fixer = new Fixer();
       const { results, totalFiles } = await analyzer.analyzeProject(analyzerOptions);
       reporter.reportResults(results, totalFiles, options.interactive);
+
+      // Generate JSON report if output option is provided
+      if (options.output) {
+        try {
+          const jsonReport = generateJsonReport(results, totalFiles);
+          let outputPath: string;
+          
+          if (typeof options.output === 'string') {
+            // Path was provided
+            outputPath = path.resolve(options.output);
+          } else {
+            // No path provided, use default
+            const now = new Date();
+            const datetime = now.getFullYear() +
+              String(now.getMonth() + 1).padStart(2, '0') +
+              String(now.getDate()).padStart(2, '0') + '-' +
+              String(now.getHours()).padStart(2, '0') +
+              String(now.getMinutes()).padStart(2, '0') +
+              String(now.getSeconds()).padStart(2, '0');
+            outputPath = path.resolve(`test-filestructure-linter-output/results-${datetime}.json`);
+          }
+          
+          // Create parent directories if they don't exist
+          const outputDir = path.dirname(outputPath);
+          if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+          }
+          
+          // Write JSON report to file
+          fs.writeFileSync(outputPath, jsonReport, 'utf-8');
+          console.log(chalk.green(`\nJSON report saved to: ${outputPath}`));
+        } catch (error) {
+          console.error(
+            chalk.red('\nError writing JSON report:'),
+            error instanceof Error ? error.message : 'Unknown error'
+          );
+        }
+      }
 
       if (results.length > 0) {
         if (options.fix) {

@@ -65,6 +65,7 @@ export class Analyzer {
         result.errors.push({
           type: AnalysisErrorType.InvalidDirectoryStructure,
           message: `Source file not found: ${sourceFileName}${mergedOptions.fileExtension}`,
+          actualTestPath: testFile,
         });
       } else if (matchingSourceFiles.length > 1) {
         // Try to find a matching source file based on subdirectory structure

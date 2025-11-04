@@ -37,6 +37,7 @@ yarn-error.log*
 # Testing
 coverage/
 .nyc_output/
+test-filestructure-linter-output/
 
 # Operating System
 .DS_Store
