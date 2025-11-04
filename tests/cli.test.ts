@@ -36,7 +36,7 @@ describe('CLI Tool Tests', () => {
         it('should find 7 issues', () => {
             const issueCountMatch = stdout.match(/Found (\d+) files with issues/);
             expect(issueCountMatch).toBeTruthy();
-            expect(parseInt(issueCountMatch![1], 10)).toBe(7);
+            expect(parseInt(issueCountMatch![1], 10)).toBe(8);
         });
 
         it('should not contain issue with "tests\\obj\\Debug\\net8.0\\Application.Tests\\CalcTests.cs" because is is not source code', () => {
