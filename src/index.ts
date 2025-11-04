@@ -73,13 +73,6 @@ program
       console.log(chalk.gray(`Source root: ${srcRoot}`));
       console.log(chalk.gray(`Test root: ${testRoot}`));
 
-      if (options.ignoreDirectories && options.ignoreDirectories.length > 0) {
-        console.log(chalk.gray(`Ignored directories: ${options.ignoreDirectories.join(', ')}`));
-      }
-
-      if (options.ignoreFiles && options.ignoreFiles.length > 0) {
-        console.log(chalk.gray(`Ignored files: ${options.ignoreFiles.join(', ')}`));
-      }
 
       const analyzerOptions: AnalyzerOptions = {
         srcRoot,

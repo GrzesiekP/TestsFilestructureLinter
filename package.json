@@ -14,7 +14,7 @@
     "build": "rimraf dist && tsc --project tsconfig.json",
     "clean": "rimraf dist",
     "dev": "ts-node src/index.ts",
-    "test": "npm run build %% jest --no-coverage",
+    "test": "npm run build && jest --no-coverage",
     "test:watch": "npm run build %% jest --watch --no-coverage",
     "test:debug": "npm run build %% node --inspect-brk ./node_modules/jest/bin/jest.js --runInBand --no-coverage tests/cli.test.ts",
     "test:cli": "npm run build %% jest tests/cli.test.ts --verbose --no-coverage",
