@@ -48,7 +48,6 @@ describe('CLI Tool Tests', () => {
         }
     };
 
-    // Common tests that run for both scenarios
     describe('Common validation tests', () => {
         // Store results for both scenarios
         const scenarios = [
@@ -146,7 +145,6 @@ describe('CLI Tool Tests', () => {
         });
     });
 
-    // Scenario 1 specific tests
     describe('Scenario 1: Default options - specific validations', () => {
         let jsonOutput: any;
 
