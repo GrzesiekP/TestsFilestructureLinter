@@ -156,12 +156,12 @@ describe('CLI Tool Tests', () => {
         const hasIssue = (fileName: string) => 
             jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
 
-        it('should have 6 issues in summary', () => {
-            expect(jsonOutput.summary.totalFilesWithIssues).toBe(6);
+        it('should have 7 issues in summary', () => {
+            expect(jsonOutput.summary.totalFilesWithIssues).toBe(7);
         });
 
-        it('should find 6 issues', () => {
-            expect(jsonOutput.filesWithIssues.length).toBe(6);
+        it('should find 7 issues', () => {
+            expect(jsonOutput.filesWithIssues.length).toBe(7);
         });
 
         it('should contain issue with ToBeIgnoredTests.cs because it is in the ignore list', () => {
