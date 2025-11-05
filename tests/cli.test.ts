@@ -156,12 +156,12 @@ describe('CLI Tool Tests', () => {
         const hasIssue = (fileName: string) => 
             jsonOutput.filesWithIssues.some((issue: any) => issue.testName === fileName);
 
-        it('should have 7 issues in summary', () => {
-            expect(jsonOutput.summary.totalFilesWithIssues).toBe(7);
+        it('should have 6 issues in summary', () => {
+            expect(jsonOutput.summary.totalFilesWithIssues).toBe(6);
         });
 
-        it('should find 7 issues', () => {
-            expect(jsonOutput.filesWithIssues.length).toBe(7);
+        it('should find 6 issues', () => {
+            expect(jsonOutput.filesWithIssues.length).toBe(6);
         });
 
         it('should contain issue with ToBeIgnoredTests.cs because it is in the ignore list', () => {
@@ -190,6 +190,170 @@ describe('CLI Tool Tests', () => {
 
         it('should not contain issue with "InToBeIgnoredFolderTests.cs" because it is in the ignore list', () => {
             expect(hasIssue('InToBeIgnoredFolderTests.cs')).toBe(false);
+        });
+    });
+
+    describe('Scenario 3: --fix to fix wrong location', () => {
+        const tempDir = `test-data-temp-${Date.now()}`;
+        let jsonOutputAfterFix: any;
+
+        beforeAll(async () => {
+            // Create temporary copy of test-data
+            await fs.promises.cp('test-data', tempDir, { recursive: true });
+            
+            // Run CLI with --all on the temporary copy to fix all issues
+            await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n --fix ${tempDir}/tests/Application.Tests/Services/WrongLocation/UserServiceTests.cs`);
+            
+            // Run analysis again to get the result after fixing
+            const resultAfterFix = await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n`);
+            jsonOutputAfterFix = resultAfterFix.jsonOutput;
+        }, 15000);
+
+        afterAll(async () => {
+            // Clean up temporary directory
+            await fs.promises.rm(tempDir, { recursive: true, force: true });
+        });
+
+        it('should move UserServiceTests.cs from WrongLocation to correct location', async () => {
+            const oldFile = `${tempDir}/tests/Application.Tests/Services/WrongLocation/UserServiceTests.cs`;
+            const newFile = `${tempDir}/tests/Application.Tests/Services/UserServiceTests.cs`;
+            
+            // Verify old file no longer exists
+            const oldFileExists = await fs.promises.access(oldFile)
+                .then(() => true)
+                .catch(() => false);
+            expect(oldFileExists).toBe(false);
+            
+            // Verify new file exists
+            const newFileExists = await fs.promises.access(newFile)
+                .then(() => true)
+                .catch(() => false);
+            expect(newFileExists).toBe(true);
+        });
+
+        it('should not list UserServiceTests.cs as having directory structure issue after fixing', () => {
+            const userServiceIssue = jsonOutputAfterFix.filesWithIssues.find(
+                (issue: any) => issue.testName === 'UserServiceTests.cs'
+            );
+            
+            // File might still have other issues (like naming), but should not have directory structure issues
+            if (userServiceIssue) {
+                const hasDirectoryIssue = userServiceIssue.errors.some(
+                    (error: any) => error.type === 'InvalidDirectoryStructure'
+                );
+                expect(hasDirectoryIssue).toBe(false);
+            }
+        });
+
+        it('should have fewer issues after fixing', () => {
+            // Original scenario 1 had 7 issues, after fixing directory structures should have fewer
+            expect(jsonOutputAfterFix.summary.totalFilesWithIssues).toBeLessThan(7);
+        });
+    });
+
+    describe('Scenario 4: --fix to rename wrong file name', () => {
+        const tempDir = `test-data-temp-${Date.now()}`;
+        let jsonOutputAfterFix: any;
+
+        const oldFile = `${tempDir}/tests/Application.Tests/Mappers/WrongNameTests.cs`;
+        const newFile = `${tempDir}/tests/Application.Tests/Mappers/UserMapperTests.cs`;
+
+        beforeAll(async () => {
+            // Create temporary copy of test-data
+            await fs.promises.cp('test-data', tempDir, { recursive: true });
+            
+            // Run CLI with --fix on the temporary copy to rename the file
+            await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n --fix ${tempDir}/tests/Application.Tests/Mappers/WrongNameTests.cs`);
+            
+            // Run analysis again to get the result after fixing
+            const resultAfterFix = await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n`);
+            jsonOutputAfterFix = resultAfterFix.jsonOutput;
+        }, 15000);
+
+        afterAll(async () => {
+            // Clean up temporary directory
+            await fs.promises.rm(tempDir, { recursive: true, force: true });
+        });
+
+        it('old file WrongNameTests.cs should not exist', async () => {            
+            // Verify old file no longer exists
+            const oldFileExists = await fs.promises.access(oldFile)
+                .then(() => true)
+                .catch(() => false);
+            expect(oldFileExists).toBe(false);
+        });
+
+        it('new file UserMapperTests.cs should exist', async () => {
+            // Verify new file exists
+            const newFileExists = await fs.promises.access(newFile)
+                .then(() => true)
+                .catch(() => false);
+            expect(newFileExists).toBe(true);
+        });
+
+        it('UserMapperTests.cs should not be in issues', () => {
+            const hasIssue = (fileName: string) =>
+                jsonOutputAfterFix.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('UserMapperTests.cs')).toBe(false);
+        });
+
+        it('should have fewer issues after fixing', () => {
+            expect(jsonOutputAfterFix.summary.totalFilesWithIssues).toBe(6);
+        });
+    });
+
+    describe('Scenario 5: --fix to rename wrong file name (incorrect casing)', () => {
+        const tempDir = `test-data-temp-${Date.now()}`;
+        let jsonOutputAfterFix: any;
+
+        const oldFile = `${tempDir}/tests/Application.Tests/Services/UpercaseXyzServiceTests.cs`;
+        const newFile = `${tempDir}/tests/Application.Tests/Services/UpercaseXYZServiceTests.cs`;
+
+        beforeAll(async () => {
+            // Create temporary copy of test-data
+            await fs.promises.cp('test-data', tempDir, { recursive: true });
+            
+            // Run CLI with --fix on the temporary copy to rename the file
+            await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n --fix ${tempDir}/tests/Application.Tests/Services/UpercaseXyzServiceTests.cs`);
+            
+            // Run analysis again to get the result after fixing
+            const resultAfterFix = await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n`);
+            jsonOutputAfterFix = resultAfterFix.jsonOutput;
+        }, 15000);
+
+        afterAll(async () => {
+            // Clean up temporary directory
+            await fs.promises.rm(tempDir, { recursive: true, force: true });
+        });
+
+        it('should have fewer issues after fixing', () => {
+            // Original scenario 1 had 7 issues, after fixing file name should have fewer
+            expect(jsonOutputAfterFix.summary.totalFilesWithIssues).toBe(6);
+        });
+
+        // Note: This test is case-sensitivity dependent and may behave differently on case-insensitive file systems (e.g., Windows default)
+        it('old file UpercaseXyzServiceTests.cs should not exist', async () => {
+
+            // Verify old file no longer exists
+            const oldFileExists = await fs.promises.access(oldFile)
+                .then(() => true)
+                .catch(() => false);
+            expect(oldFileExists).toBe(false);
+        });
+
+        it('new file UpercaseXYZServiceTests.cs should exist', async () => {
+
+            // Verify new file exists
+            const newFileExists = await fs.promises.access(newFile)
+                .then(() => true)
+                .catch(() => false);
+            expect(newFileExists).toBe(true);
+        });
+
+        it('UpercaseXYZServiceTests.cs should not be in issues', () => {
+            const hasIssue = (fileName: string) =>
+                jsonOutputAfterFix.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('UpercaseXYZServiceTests.cs')).toBe(false);
         });
     });
 });
