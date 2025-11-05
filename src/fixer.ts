@@ -40,7 +40,7 @@ export class Fixer {
             break;
           case AnalysisErrorType.InvalidFileName:
             if (options.renameInvalidFiles) {
-              await this.renameInvalidTestFile(result.testFilePath);
+              await this.renameInvalidTestFile(error, []);
             }
             break;
           case AnalysisErrorType.InvalidDirectoryStructure:
@@ -58,9 +58,38 @@ export class Fixer {
     throw new Error('Not implemented');
   }
 
-  private renameInvalidTestFile(testPath: string): Promise<void> {
-    // Implementation for renaming invalid test files
-    throw new Error('Not implemented');
+  private async renameInvalidTestFile(
+    error: AnalysisError,
+    fixedFiles: FixResult[],
+  ): Promise<void> {
+    if (!error.actualTestPath || !error.expectedTestPath) {
+      console.log('[DEBUG] Missing paths, returning early');
+      return;
+    }
+
+    const actualPath = error.actualTestPath;
+    const expectedPath = error.expectedTestPath;
+
+    // Check if paths differ only in case (case-sensitive rename needed on Windows)
+    if (actualPath.toLowerCase() === expectedPath.toLowerCase()) {
+      // Two-step rename for case-only changes
+      const tempPath = path.join(
+        path.dirname(actualPath),
+        `temp_${Date.now()}_${path.basename(expectedPath)}`,
+      );
+      await fs.rename(actualPath, tempPath);
+      await fs.rename(tempPath, expectedPath);
+    } else {
+      // Direct rename
+      await fs.rename(actualPath, expectedPath);
+    }
+
+    console.log(`Renamed: ${error.actualTestPath} → ${error.expectedTestPath}`);
+
+    fixedFiles.push({
+      from: actualPath,
+      to: expectedPath,
+    });
   }
 
   async isFixable(testFilePath: string, results: AnalysisResult[]): Promise<FixableResult> {
@@ -73,10 +102,11 @@ export class Fixer {
       };
     }
 
-    // Check if it has a directory structure error that can be fixed
+    // Check if it has a directory structure or filename error that can be fixed
     const error = result.errors.find(
       (e) =>
-        e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+        (e.type === AnalysisErrorType.InvalidDirectoryStructure ||
+         e.type === AnalysisErrorType.InvalidFileName) &&
         e.actualTestPath &&
         e.expectedTestPath &&
         e.sourceFilePath,
@@ -85,7 +115,7 @@ export class Fixer {
     if (!error) {
       return {
         isFixable: false,
-        error: 'File has no fixable directory structure issues',
+        error: 'File has no fixable directory structure or filename issues',
       };
     }
 
@@ -93,7 +123,11 @@ export class Fixer {
       isFixable: true,
       fix: async () => {
         const fixedFiles: FixResult[] = [];
-        await this.moveTestFile(error, fixedFiles);
+        if (error.type === AnalysisErrorType.InvalidFileName) {
+          await this.renameInvalidTestFile(error, fixedFiles);
+        } else {
+          await this.moveTestFile(error, fixedFiles);
+        }
         return fixedFiles[0];
       },
     };

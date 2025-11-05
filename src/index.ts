@@ -154,7 +154,7 @@ program
           const fixableFiles = results.filter((r: AnalysisResult) =>
             r.errors.some(
               (e: AnalysisError) =>
-                e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+                (e.type === AnalysisErrorType.InvalidDirectoryStructure || e.type === AnalysisErrorType.InvalidFileName) &&
                 e.actualTestPath &&
                 e.expectedTestPath &&
                 e.sourceFilePath,
@@ -185,7 +185,7 @@ program
                 hint: '(Use arrow keys and space to select, enter to confirm)',
                 choices: currentFiles.map((file: AnalysisResult) => {
                   const error = file.errors.find(
-                    (e: AnalysisError) => e.type === AnalysisErrorType.InvalidDirectoryStructure,
+                    (e: AnalysisError) => e.type === AnalysisErrorType.InvalidDirectoryStructure || e.type === AnalysisErrorType.InvalidFileName,
                   );
                   const currentPath = path.relative(testRoot, file.testFilePath);
                   const targetPath = error?.expectedTestPath
