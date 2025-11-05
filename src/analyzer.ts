@@ -97,14 +97,34 @@ export class Analyzer {
             mergedOptions,
           );
 
-          if (path.normalize(testFile) !== path.normalize(expectedTestPath)) {
-            result.errors.push({
-              type: AnalysisErrorType.InvalidDirectoryStructure,
-              message: 'Test file is in wrong directory',
-              sourceFilePath: matchingSourceByDir,
-              actualTestPath: testFile,
-              expectedTestPath: expectedTestPath,
-            });
+          // Use case-sensitive comparison to detect case-only differences (important on Windows)
+          if (testFile !== expectedTestPath) {
+            // Extract directory and filename components
+            const actualDir = path.dirname(testFile);
+            const expectedDir = path.dirname(expectedTestPath);
+            const actualFileName = path.basename(testFile);
+            const expectedFileName = path.basename(expectedTestPath);
+
+            // Compare directories (case-insensitive for cross-platform compatibility)
+            if (path.normalize(actualDir) === path.normalize(expectedDir)) {
+              // Same directory, different filename (including case-only differences)
+              result.errors.push({
+                type: AnalysisErrorType.InvalidFileName,
+                message: `Test file has incorrect name. Expected: ${expectedFileName}`,
+                sourceFilePath: matchingSourceByDir,
+                actualTestPath: testFile,
+                expectedTestPath: expectedTestPath,
+              });
+            } else {
+              // Different directory
+              result.errors.push({
+                type: AnalysisErrorType.InvalidDirectoryStructure,
+                message: 'Test file is in wrong directory',
+                sourceFilePath: matchingSourceByDir,
+                actualTestPath: testFile,
+                expectedTestPath: expectedTestPath,
+              });
+            }
           }
           // No error if the subdirectory matching source file corresponds to the correct test location
         } else {
@@ -120,14 +140,34 @@ export class Analyzer {
         const sourcePath = matchingSourceFiles[0];
         const expectedTestPath = this.calculateExpectedTestPath(sourcePath, mergedOptions);
 
-        if (path.normalize(testFile) !== path.normalize(expectedTestPath)) {
-          result.errors.push({
-            type: AnalysisErrorType.InvalidDirectoryStructure,
-            message: 'Test file is in wrong directory',
-            sourceFilePath: sourcePath,
-            actualTestPath: testFile,
-            expectedTestPath: expectedTestPath,
-          });
+        // Use case-sensitive comparison to detect case-only differences (important on Windows)
+        if (testFile !== expectedTestPath) {
+          // Extract directory and filename components
+          const actualDir = path.dirname(testFile);
+          const expectedDir = path.dirname(expectedTestPath);
+          const actualFileName = path.basename(testFile);
+          const expectedFileName = path.basename(expectedTestPath);
+
+          // Compare directories (case-insensitive for cross-platform compatibility)
+          if (path.normalize(actualDir) === path.normalize(expectedDir)) {
+            // Same directory, different filename (including case-only differences)
+            result.errors.push({
+              type: AnalysisErrorType.InvalidFileName,
+              message: `Test file has incorrect name. Expected: ${expectedFileName}`,
+              sourceFilePath: sourcePath,
+              actualTestPath: testFile,
+              expectedTestPath: expectedTestPath,
+            });
+          } else {
+            // Different directory
+            result.errors.push({
+              type: AnalysisErrorType.InvalidDirectoryStructure,
+              message: 'Test file is in wrong directory',
+              sourceFilePath: sourcePath,
+              actualTestPath: testFile,
+              expectedTestPath: expectedTestPath,
+            });
+          }
         }
       }
 

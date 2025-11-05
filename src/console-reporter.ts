@@ -106,6 +106,50 @@ export class ConsoleReporter {
           } else {
             console.log(chalk.gray(`  🧪 ${error.message}`));
           }
+        } else if (error.type === AnalysisErrorType.InvalidFileName && error.sourceFilePath) {
+          const paths = [error.sourceFilePath];
+          if (error.actualTestPath) paths.push(error.actualTestPath);
+          if (error.expectedTestPath) paths.push(error.expectedTestPath);
+          const commonBasePath = this.getCommonBasePath(paths);
+
+          // Check if we have multiple source files
+          if (error.sourceFilePath.includes(',')) {
+            const sourceFiles = error.sourceFilePath.split(',').map((p) => p.trim());
+            console.log(chalk.gray(`  📄 Source:   Multiple source files found:`));
+            for (const sourcePath of sourceFiles) {
+              // Ensure path starts with ./src
+              const sourceRelative = this.formatToStandardPath(sourcePath, 'src');
+              console.log(chalk.gray(`    - ${sourceRelative}`));
+            }
+
+            // Display current test file location
+            if (error.actualTestPath) {
+              // Ensure path starts with ./tests
+              const actualRelative = this.formatToStandardPath(error.actualTestPath, 'tests');
+              console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
+            }
+          } else {
+            const sourceRelative = this.getRelativePath(error.sourceFilePath, commonBasePath);
+            console.log(chalk.gray(`  📄 Source:   ${sourceRelative}`));
+          }
+
+          if (error.actualTestPath && error.expectedTestPath) {
+            const incorrectSegment = this.extractIncorrectSegment(error.message);
+            const actualRelative = this.getRelativePath(error.actualTestPath, commonBasePath);
+            const expectedRelative = this.getRelativePath(error.expectedTestPath, commonBasePath);
+
+            if (incorrectSegment) {
+              const highlightedPath = this.highlightIncorrectSegment(
+                actualRelative,
+                incorrectSegment,
+              );
+              console.log(chalk.gray(`  🧪 Current:  `) + highlightedPath);
+              console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
+            } else {
+              console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
+              console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
+            }
+          }
         }
       }
       console.log('');

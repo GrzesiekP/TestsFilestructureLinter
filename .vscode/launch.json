@@ -17,6 +17,22 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "disableOptimisticBPs": true
-    }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug CLI Command",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "args": [
+        "${workspaceFolder}/src/index.ts",
+        "--src-root", "${workspaceFolder}/test-data/src",
+        "--test-root", "${workspaceFolder}/test-data/tests",
+        "--dir",
+        "--name"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
   ]
 } 
