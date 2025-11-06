@@ -304,5 +304,45 @@ describe('CLI Tool Tests', () => {
                 jsonOutputAfterFix.filesWithIssues.some((issue: any) => issue.testName === fileName);
             expect(hasIssue('UpercaseXYZServiceTests.cs')).toBe(false);
         });
+
+        it('should update class name from "UpercaseXyzServiceTests" to "UpercaseXYZServiceTests" in file content', async () => {
+            const content = await fs.promises.readFile(newFilePath, 'utf-8');
+            
+            // Check that the new class name exists
+            expect(content).toContain('public class UpercaseXYZServiceTests');
+            
+            // Check that the old class name does NOT exist
+            expect(content).not.toContain('public class UpercaseXyzServiceTests');
+        });
+
+        it('should update ALL occurrences of the old class name in the file', async () => {
+            const content = await fs.promises.readFile(newFilePath, 'utf-8');
+            
+            // Count occurrences of old class name (should be 0)
+            const oldClassNameMatches = content.match(/\bUpercaseXyzServiceTests\b/g);
+            expect(oldClassNameMatches).toBeNull();
+            
+            // Verify new class name exists at least once (the class declaration)
+            const newClassNameMatches = content.match(/\bUpercaseXYZServiceTests\b/g);
+            expect(newClassNameMatches).not.toBeNull();
+            expect(newClassNameMatches!.length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('should preserve file structure and other content when updating class name', async () => {
+            const content = await fs.promises.readFile(newFilePath, 'utf-8');
+            
+            // Verify namespace is preserved
+            expect(content).toContain('namespace Application.Tests.Services');
+            
+            // Verify attributes are preserved
+            expect(content).toContain('[TestClass]');
+            expect(content).toContain('[TestMethod]');
+            
+            // Verify method names are preserved
+            expect(content).toContain('DoSomething_Should_DoSomething');
+            
+            // Verify the service reference is preserved (should NOT be changed)
+            expect(content).toContain('new UpercaseXYZService()');
+        });
     });
 });

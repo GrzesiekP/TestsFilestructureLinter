@@ -78,6 +78,16 @@ export class Fixer {
     const actualPath = error.actualTestPath;
     const expectedPath = error.expectedTestPath;
 
+    // Read the file content before renaming
+    const content = await fs.readFile(actualPath, 'utf8');
+
+    // Extract class names from filenames (without extension)
+    const oldClassName = path.basename(actualPath, path.extname(actualPath));
+    const newClassName = path.basename(expectedPath, path.extname(expectedPath));
+
+    // Replace all occurrences of the old class name with the new class name
+    const updatedContent = this.updateClassName(content, oldClassName, newClassName);
+
     // Check if paths differ only in case (case-sensitive rename needed on Windows)
     if (actualPath.toLowerCase() === expectedPath.toLowerCase()) {
       // Two-step rename for case-only changes
@@ -86,10 +96,12 @@ export class Fixer {
         `temp_${Date.now()}_${path.basename(expectedPath)}`,
       );
       await fs.rename(actualPath, tempPath);
-      await fs.rename(tempPath, expectedPath);
+      await fs.writeFile(expectedPath, updatedContent);
+      await fs.unlink(tempPath);
     } else {
-      // Direct rename
-      await fs.rename(actualPath, expectedPath);
+      // Direct rename: write to new location and delete old file
+      await fs.writeFile(expectedPath, updatedContent);
+      await fs.unlink(actualPath);
     }
 
     console.log(`Renamed: ${error.actualTestPath} → ${error.expectedTestPath}`);
@@ -221,6 +233,17 @@ export class Fixer {
     }
 
     return content;
+  }
+
+  private updateClassName(content: string, oldClassName: string, newClassName: string): string {
+    // Only replace if class names are different
+    if (oldClassName === newClassName) {
+      return content;
+    }
+
+    // Use word boundary to match whole class name only
+    const classNameRegex = new RegExp(`\\b${this.escapeRegExp(oldClassName)}\\b`, 'g');
+    return content.replace(classNameRegex, newClassName);
   }
 
   private extractNamespaceFromPath(filePath: string): string | null {

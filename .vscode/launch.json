@@ -36,6 +36,23 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug CLI Command (fix UpercaseXyzServiceTests)",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "args": [
+        "${workspaceFolder}/src/index.ts",
+        "--src-root", "${workspaceFolder}/test-data/src",
+        "--test-root", "${workspaceFolder}/test-data/tests",
+        "--dir",
+        "--name",
+        "--fix", "${workspaceFolder}/test-data/tests/Application.Tests//Services/UpercaseXyzServiceTests.cs"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
     }
   ]
 }
