@@ -11,7 +11,7 @@ export async function saveReport(
   results: AnalysisResult[],
   options: ReportOptions,
 ): Promise<string> {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
   const fileName = `${options.projectName}-analysis-${timestamp}.json`;
   const outputPath = path.join(options.outputDir, fileName);
 

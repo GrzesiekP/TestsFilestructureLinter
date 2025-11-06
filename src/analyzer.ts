@@ -23,7 +23,7 @@ export class Analyzer {
       ignoreFiles: options.ignoreFiles ?? DEFAULT_OPTIONS.ignoreFiles,
     };
 
-      const normalizedIgnoreFiles = new Set(mergedOptions.ignoreFiles.map((f) => f.toLowerCase()));
+    const normalizedIgnoreFiles = new Set(mergedOptions.ignoreFiles.map((f) => f.toLowerCase()));
     // Find all test files - always pass the ignore configurations
     const testFiles = await this.findTestFiles(
       mergedOptions.testRoot,
@@ -72,42 +72,39 @@ export class Analyzer {
   filterResults(result: AnalysisResult, mergedOptions: AnalyzerOptions): boolean {
     const normalizedPath = path.normalize(result.testFilePath);
 
-      // Skip results for files in ignored directories
-      for (const ignoreDir of mergedOptions.ignoreDirectories) {
-        // Check if path contains the directory with proper path separators
-        // Handle various positions: start, middle, end of path
-        const normalizedIgnoreDir = ignoreDir.replace(/[/\\]/g, path.sep);
+    // Skip results for files in ignored directories
+    for (const ignoreDir of mergedOptions.ignoreDirectories) {
+      // Check if path contains the directory with proper path separators
+      // Handle various positions: start, middle, end of path
+      const normalizedIgnoreDir = ignoreDir.replaceAll(/[/\\]/g, path.sep);
 
-        // Check for ignored directory in path
-        if (
-          normalizedPath.includes(`${path.sep}${normalizedIgnoreDir}${path.sep}`) || // Middle
-          normalizedPath.endsWith(`${path.sep}${normalizedIgnoreDir}`) || // End
-          normalizedPath.startsWith(`${normalizedIgnoreDir}${path.sep}`) // Start
-        ) {
-          return false;
-        }
+      // Check for ignored directory in path
+      if (
+        normalizedPath.includes(`${path.sep}${normalizedIgnoreDir}${path.sep}`) || // Middle
+        normalizedPath.endsWith(`${path.sep}${normalizedIgnoreDir}`) || // End
+        normalizedPath.startsWith(`${normalizedIgnoreDir}${path.sep}`) // Start
+      ) {
+        return false;
       }
+    }
 
-      // Skip results for ignored files
-      for (const ignoreFile of mergedOptions.ignoreFiles) {
-        if (path.basename(normalizedPath).toLowerCase() === ignoreFile.toLowerCase()) {
-          return false;
-        }
+    // Skip results for ignored files
+    for (const ignoreFile of mergedOptions.ignoreFiles) {
+      if (path.basename(normalizedPath).toLowerCase() === ignoreFile.toLowerCase()) {
+        return false;
       }
+    }
 
-      return true;
+    return true;
   }
 
   async analyzeTestFile(
     testFile: string,
     mergedOptions: AnalyzerOptions,
-    sourceFiles: string[]
+    sourceFiles: string[],
   ): Promise<AnalysisResult | null> {
     const testFileName = path.basename(testFile, mergedOptions.fileExtension);
-    const sourceFileName = testFileName.replace(
-      new RegExp(`${mergedOptions.testFileSuffix}$`),
-      ''
-    );
+    const sourceFileName = testFileName.replace(new RegExp(`${mergedOptions.testFileSuffix}$`), '');
     const matchingSourceFiles = await this.findMatchingSourceFiles(
       sourceFiles,
       sourceFileName,
@@ -142,7 +139,7 @@ export class Analyzer {
     testFile: string,
     matchingSourceFiles: string[],
     mergedOptions: AnalyzerOptions,
-    result: AnalysisResult
+    result: AnalysisResult,
   ): void {
     const relativeTestPath = path.relative(mergedOptions.testRoot, testFile);
     const testDirPath = path.dirname(relativeTestPath);
@@ -154,7 +151,7 @@ export class Analyzer {
       matchingSourceFiles,
       testProjectDirSegment,
       testPathAfterProjectDir,
-      mergedOptions
+      mergedOptions,
     );
 
     if (matchingSourceByDir) {
@@ -174,7 +171,7 @@ export class Analyzer {
     matchingSourceFiles: string[],
     testProjectDirSegment: string,
     testPathAfterProjectDir: string,
-    mergedOptions: AnalyzerOptions
+    mergedOptions: AnalyzerOptions,
   ): string | undefined {
     return matchingSourceFiles.find((file) => {
       const relativeSourcePath = path.relative(mergedOptions.srcRoot, file);
@@ -184,7 +181,8 @@ export class Analyzer {
       const sourcePathAfterProjectDir = sourceDirSegments.slice(1).join(path.sep);
 
       return (
-        sourceProjectDirSegment === testProjectDirSegment.replace(mergedOptions.testProjectSuffix, '') &&
+        sourceProjectDirSegment ===
+          testProjectDirSegment.replace(mergedOptions.testProjectSuffix, '') &&
         sourcePathAfterProjectDir === testPathAfterProjectDir
       );
     });
@@ -194,7 +192,7 @@ export class Analyzer {
     testFile: string,
     sourcePath: string,
     mergedOptions: AnalyzerOptions,
-    result: AnalysisResult
+    result: AnalysisResult,
   ): void {
     const expectedTestPath = this.calculateExpectedTestPath(sourcePath, mergedOptions);
     this.validateTestFilePath(testFile, expectedTestPath, sourcePath, result);
@@ -204,7 +202,7 @@ export class Analyzer {
     testFile: string,
     expectedTestPath: string,
     sourcePath: string,
-    result: AnalysisResult
+    result: AnalysisResult,
   ): void {
     if (testFile === expectedTestPath) {
       return;
@@ -376,7 +374,7 @@ export class Analyzer {
       const baseName = path.basename(file, extension).toLowerCase();
       const existingPaths = sourceMap.get(baseName) || [];
       sourceMap.set(baseName, [...existingPaths, file]);
-    };
+    }
 
     return sourceMap;
   }

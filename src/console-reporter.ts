@@ -104,10 +104,7 @@ export class ConsoleReporter {
     }
   }
 
-  private displayMissingTestError(
-    error: { message: string },
-    result: AnalysisResult,
-  ): void {
+  private displayMissingTestError(error: { message: string }, result: AnalysisResult): void {
     const sourceFile = new RegExp(/source file: (.+)$/).exec(error.message)?.[1];
     if (sourceFile) {
       const sourceRelative = this.getRelativePath(
@@ -189,10 +186,7 @@ export class ConsoleReporter {
       const expectedRelative = this.getRelativePath(error.expectedTestPath, commonBasePath);
 
       if (incorrectSegment) {
-        const highlightedPath = this.highlightIncorrectSegment(
-          actualRelative,
-          incorrectSegment,
-        );
+        const highlightedPath = this.highlightIncorrectSegment(actualRelative, incorrectSegment);
         console.log(chalk.gray(`  🧪 Current:  `) + highlightedPath);
         console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
       } else {
@@ -286,7 +280,7 @@ export class ConsoleReporter {
     const srcTestMatch = srcTestRegex.exec(filePath);
     if (srcTestMatch) {
       // Convert backslashes to forward slashes
-      const remainingPath = srcTestMatch[3].replace(/\\/g, '/');
+      const remainingPath = srcTestMatch[3].replaceAll(/\\/g, '/');
       return `./${srcTestMatch[2]}/${remainingPath}`;
     }
 
@@ -295,7 +289,7 @@ export class ConsoleReporter {
       // This is likely a test path
       const parts = filePath.split(/[/\\]tests[/\\]/);
       if (parts.length > 1) {
-        return `./tests/${parts[1].replace(/\\/g, '/')}`;
+        return `./tests/${parts[1].replaceAll(/\\/g, '/')}`;
       }
     }
 
@@ -308,8 +302,8 @@ export class ConsoleReporter {
 
     // Create the path and ensure we don't have duplicate src/src or tests/tests
     let result = `./${rootDir}/${relevantDirParts.join('/')}/${fileName}`
-      .replace(/\\/g, '/') // Convert backslashes to forward slashes
-      .replace(/\/\//g, '/'); // Remove any double slashes
+      .replaceAll(/\\/g, '/') // Convert backslashes to forward slashes
+      .replaceAll(/\/\//g, '/'); // Remove any double slashes
 
     // Remove duplicate src or tests directories
     result = result.replace(`/${rootDir}/${rootDir}/`, `/${rootDir}/`);

@@ -138,7 +138,7 @@ function formatToStandardPath(filePath: string, rootDir: 'src' | 'tests'): strin
   const srcTestMatch = srcTestRegex.exec(filePath);
   if (srcTestMatch) {
     // Convert backslashes to forward slashes
-    const remainingPath = srcTestMatch[3].replace(/\\/g, '/');
+    const remainingPath = srcTestMatch[3].replaceAll(/\\/g, '/');
     return `./${srcTestMatch[2]}/${remainingPath}`;
   }
 
@@ -147,7 +147,7 @@ function formatToStandardPath(filePath: string, rootDir: 'src' | 'tests'): strin
     // This is likely a test path
     const parts = filePath.split(/[\/\\]tests[\/\\]/);
     if (parts.length > 1) {
-      return `./tests/${parts[1].replace(/\\/g, '/')}`;
+      return `./tests/${parts[1].replaceAll(/\\/g, '/')}`;
     }
   }
 
@@ -160,8 +160,8 @@ function formatToStandardPath(filePath: string, rootDir: 'src' | 'tests'): strin
 
   // Create the path and ensure we don't have duplicate src/src or tests/tests
   let result = `./${rootDir}/${relevantDirParts.join('/')}/${fileName}`
-    .replace(/\\/g, '/') // Convert backslashes to forward slashes
-    .replace(/\/\//g, '/'); // Remove any double slashes
+    .replaceAll(/\\/g, '/') // Convert backslashes to forward slashes
+    .replaceAll(/\/\//g, '/'); // Remove any double slashes
 
   // Remove duplicate src or tests directories
   result = result.replace(`/${rootDir}/${rootDir}/`, `/${rootDir}/`);
