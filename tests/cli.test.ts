@@ -255,8 +255,11 @@ describe('CLI Tool Tests', () => {
         const tempDir = `test-data-temp-${Date.now()}`;
         let jsonOutputAfterFix: any;
 
-        const oldFile = `${tempDir}/tests/Application.Tests/Services/UpercaseXyzServiceTests.cs`;
-        const newFile = `${tempDir}/tests/Application.Tests/Services/UpercaseXYZServiceTests.cs`;
+        const serviceFolder = 'Application.Tests/Services';
+        const newFileName = 'UpercaseXYZServiceTests.cs';
+        const oldFileName = 'UpercaseXyzServiceTests.cs';
+        const oldFilePath = `${tempDir}/tests/${serviceFolder}/${oldFileName}`;
+        const newFilePath = `${tempDir}/tests/${serviceFolder}/${newFileName}`;
 
         beforeAll(async () => {
             // Create temporary copy of test-data
@@ -283,17 +286,14 @@ describe('CLI Tool Tests', () => {
         // Note: This test is case-sensitivity dependent and may behave differently on case-insensitive file systems (e.g., Windows default)
         it('old file UpercaseXyzServiceTests.cs should not exist', async () => {
 
-            // Verify old file no longer exists
-            const oldFileExists = await fs.promises.access(oldFile)
-                .then(() => true)
-                .catch(() => false);
+            const oldFileExists = fs.readdirSync(`${tempDir}/tests/Application.Tests/Services`).includes('UpercaseXyzServiceTests.cs');
             expect(oldFileExists).toBe(false);
         });
 
         it('new file UpercaseXYZServiceTests.cs should exist', async () => {
 
             // Verify new file exists
-            const newFileExists = await fs.promises.access(newFile)
+            const newFileExists = await fs.promises.access(newFilePath)
                 .then(() => true)
                 .catch(() => false);
             expect(newFileExists).toBe(true);
