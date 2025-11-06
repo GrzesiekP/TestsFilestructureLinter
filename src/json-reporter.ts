@@ -1,5 +1,5 @@
 import { AnalysisResult, AnalysisErrorType } from './types';
-import * as path from 'path';
+import * as path from 'node:path';
 
 interface JsonReportError {
   testName: string;
@@ -86,7 +86,7 @@ export function generateJsonReport(results: AnalysisResult[], totalFiles: number
     summary: {
       totalFilesAnalyzed: totalFiles,
       totalFilesWithIssues: results.length,
-      issueRate: parseFloat(issueRate.toFixed(1)),
+      issueRate: Number.parseFloat(issueRate.toFixed(1)),
       errorCounts,
     },
     filesWithIssues,
@@ -103,7 +103,7 @@ function formatToStandardPath(filePath: string, rootDir: 'src' | 'tests'): strin
   }
 
   // For paths with src or tests directories
-  const srcTestRegex = new RegExp(`(.*?)[\\\/](src|tests)[\\\/](.*)`);
+  const srcTestRegex = /(.*?)[\/](src|tests)[\/](.*)/;
   const srcTestMatch = srcTestRegex.exec(filePath);
   if (srcTestMatch) {
     // Convert backslashes to forward slashes
