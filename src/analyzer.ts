@@ -1,4 +1,4 @@
-import * as path from 'path';
+import * as path from 'node:path';
 import { glob } from 'glob';
 import {
   AnalysisResult,
@@ -7,7 +7,7 @@ import {
   AnalyzerOptions,
   DEFAULT_OPTIONS,
 } from './types';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 
 export class Analyzer {
   async analyzeProject(options: Partial<AnalyzerOptions> = {}): Promise<{
@@ -71,7 +71,7 @@ export class Analyzer {
         // Try to find a matching source file based on subdirectory structure
         const relativeTestPath = path.relative(mergedOptions.testRoot, testFile);
         const testDirPath = path.dirname(relativeTestPath);
-        const testDirSegments = testDirPath.split(/[\/\\]/);
+        const testDirSegments = testDirPath.split(/[/\\]/);
         const testProjectDirSegment = testDirSegments[0];
         const testPathAfterProjectDir = testDirSegments.slice(1).join(path.sep);
 
@@ -79,7 +79,7 @@ export class Analyzer {
         const matchingSourceByDir = matchingSourceFiles.find((file) => {
           const relativeSourcePath = path.relative(mergedOptions.srcRoot, file);
           const sourceDirPath = path.dirname(relativeSourcePath);
-          const sourceDirSegments = sourceDirPath.split(/[\/\\]/);
+          const sourceDirSegments = sourceDirPath.split(/[/\\]/);
           const sourceProjectDirSegment = sourceDirSegments[0];
           const sourcePathAfterProjectDir = sourceDirSegments.slice(1).join(path.sep);
 
@@ -102,7 +102,6 @@ export class Analyzer {
             // Extract directory and filename components
             const actualDir = path.dirname(testFile);
             const expectedDir = path.dirname(expectedTestPath);
-            const actualFileName = path.basename(testFile);
             const expectedFileName = path.basename(expectedTestPath);
 
             // Compare directories (case-insensitive for cross-platform compatibility)
@@ -145,7 +144,6 @@ export class Analyzer {
           // Extract directory and filename components
           const actualDir = path.dirname(testFile);
           const expectedDir = path.dirname(expectedTestPath);
-          const actualFileName = path.basename(testFile);
           const expectedFileName = path.basename(expectedTestPath);
 
           // Compare directories (case-insensitive for cross-platform compatibility)
@@ -193,7 +191,7 @@ export class Analyzer {
       for (const ignoreDir of mergedOptions.ignoreDirectories) {
         // Check if path contains the directory with proper path separators
         // Handle various positions: start, middle, end of path
-        const normalizedIgnoreDir = ignoreDir.replace(/[\/\\]/g, path.sep);
+        const normalizedIgnoreDir = ignoreDir.replace(/[/\\]/g, path.sep);
 
         // Check for ignored directory in path
         if (
@@ -280,7 +278,7 @@ export class Analyzer {
 
           // Get the path relative to the test root to check for ignored directories
           const relativePath = path.relative(dir, f);
-          const pathSegments = relativePath.split(/[\/\\]/);
+          const pathSegments = relativePath.split(/[/\\]/);
 
           // Only include files from projects with the exact test project suffix
           if (pathSegments.length > 0) {
@@ -539,7 +537,7 @@ export class Analyzer {
   calculateExpectedTestPath(sourceFilePath: string, options: AnalyzerOptions): string {
     // Get the relative path from source root
     const relativePath = path.relative(options.srcRoot, sourceFilePath);
-    const sourceSegments = relativePath.split(/[\/\\]/);
+    const sourceSegments = relativePath.split(/[/\\]/);
 
     // Get the project name (first segment) and add test suffix
     const projectName = sourceSegments[0];
