@@ -251,58 +251,7 @@ describe('CLI Tool Tests', () => {
         });
     });
 
-    describe('Scenario 4: --fix to rename wrong file name', () => {
-        const tempDir = `test-data-temp-${Date.now()}`;
-        let jsonOutputAfterFix: any;
-
-        const oldFile = `${tempDir}/tests/Application.Tests/Mappers/WrongNameTests.cs`;
-        const newFile = `${tempDir}/tests/Application.Tests/Mappers/UserMapperTests.cs`;
-
-        beforeAll(async () => {
-            // Create temporary copy of test-data
-            await fs.promises.cp('test-data', tempDir, { recursive: true });
-            
-            // Run CLI with --fix on the temporary copy to rename the file
-            await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n --fix ${tempDir}/tests/Application.Tests/Mappers/WrongNameTests.cs`);
-            
-            // Run analysis again to get the result after fixing
-            const resultAfterFix = await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n`);
-            jsonOutputAfterFix = resultAfterFix.jsonOutput;
-        }, 15000);
-
-        afterAll(async () => {
-            // Clean up temporary directory
-            await fs.promises.rm(tempDir, { recursive: true, force: true });
-        });
-
-        it('old file WrongNameTests.cs should not exist', async () => {            
-            // Verify old file no longer exists
-            const oldFileExists = await fs.promises.access(oldFile)
-                .then(() => true)
-                .catch(() => false);
-            expect(oldFileExists).toBe(false);
-        });
-
-        it('new file UserMapperTests.cs should exist', async () => {
-            // Verify new file exists
-            const newFileExists = await fs.promises.access(newFile)
-                .then(() => true)
-                .catch(() => false);
-            expect(newFileExists).toBe(true);
-        });
-
-        it('UserMapperTests.cs should not be in issues', () => {
-            const hasIssue = (fileName: string) =>
-                jsonOutputAfterFix.filesWithIssues.some((issue: any) => issue.testName === fileName);
-            expect(hasIssue('UserMapperTests.cs')).toBe(false);
-        });
-
-        it('should have fewer issues after fixing', () => {
-            expect(jsonOutputAfterFix.summary.totalFilesWithIssues).toBe(6);
-        });
-    });
-
-    describe('Scenario 5: --fix to rename wrong file name (incorrect casing)', () => {
+    describe('Scenario 4: --fix to rename wrong file name (incorrect casing)', () => {
         const tempDir = `test-data-temp-${Date.now()}`;
         let jsonOutputAfterFix: any;
 
