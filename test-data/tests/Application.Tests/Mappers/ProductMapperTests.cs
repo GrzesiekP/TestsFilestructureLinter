@@ -1,3 +1,5 @@
+// This test has no correspoding source file matching name, so should be recognized as Invalid Directory Structure without expected path and source.
+
 using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 

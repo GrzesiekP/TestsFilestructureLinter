@@ -5,18 +5,54 @@
       "type": "node",
       "request": "launch",
       "name": "Debug CLI Test",
-      "program": "${workspaceFolder}/node_modules/jest/bin/jest",
+      "program": "${workspaceFolder}/node_modules/jest/bin/jest.js",
       "args": [
+        "--runInBand",
+        "--no-cache",
         "--config",
         "${workspaceFolder}/jest.config.js",
-        "--testMatch",
-        "**/tests/**/*.test.ts",
-        "--runInBand",
         "tests/cli.test.ts"
       ],
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
-      "disableOptimisticBPs": true
+      "sourceMaps": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug CLI Command",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "args": [
+        "${workspaceFolder}/src/index.ts",
+        "--src-root", "${workspaceFolder}/test-data/src",
+        "--test-root", "${workspaceFolder}/test-data/tests",
+        "--dir",
+        "--name"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug CLI Command (fix UpercaseXyzServiceTests)",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "args": [
+        "${workspaceFolder}/src/index.ts",
+        "--src-root", "${workspaceFolder}/test-data/src",
+        "--test-root", "${workspaceFolder}/test-data/tests",
+        "--dir",
+        "--name",
+        "--fix", "${workspaceFolder}/test-data/tests/Application.Tests//Services/UpercaseXyzServiceTests.cs"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
     }
   ]
-} 
+}

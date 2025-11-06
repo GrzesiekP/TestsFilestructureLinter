@@ -1,3 +1,5 @@
+// This test has wrong name. Should be UserMapperTests. For now recognizing source file front test code is not supported, so the error should be Invalid Directory Structure
+
 using Application.Mappers;
 using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;

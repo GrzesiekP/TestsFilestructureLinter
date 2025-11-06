@@ -1,0 +1,1 @@
+// This test has corresponding source file (name match), but in different namespace. So there should be an error Invalid Directory Structure and test should be fixable by moving to correct expeted directory.

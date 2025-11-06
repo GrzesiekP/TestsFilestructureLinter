@@ -192,4 +192,157 @@ describe('CLI Tool Tests', () => {
             expect(hasIssue('InToBeIgnoredFolderTests.cs')).toBe(false);
         });
     });
+
+    describe('Scenario 3: --fix to fix wrong location', () => {
+        const tempDir = `test-data-temp-${Date.now()}`;
+        let jsonOutputAfterFix: any;
+
+        beforeAll(async () => {
+            // Create temporary copy of test-data
+            await fs.promises.cp('test-data', tempDir, { recursive: true });
+            
+            // Run CLI with --all on the temporary copy to fix all issues
+            await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n --fix ${tempDir}/tests/Application.Tests/Services/WrongLocation/UserServiceTests.cs`);
+            
+            // Run analysis again to get the result after fixing
+            const resultAfterFix = await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n`);
+            jsonOutputAfterFix = resultAfterFix.jsonOutput;
+        }, 15000);
+
+        afterAll(async () => {
+            // Clean up temporary directory
+            await fs.promises.rm(tempDir, { recursive: true, force: true });
+        });
+
+        it('should move UserServiceTests.cs from WrongLocation to correct location', async () => {
+            const oldFile = `${tempDir}/tests/Application.Tests/Services/WrongLocation/UserServiceTests.cs`;
+            const newFile = `${tempDir}/tests/Application.Tests/Services/UserServiceTests.cs`;
+            
+            // Verify old file no longer exists
+            const oldFileExists = await fs.promises.access(oldFile)
+                .then(() => true)
+                .catch(() => false);
+            expect(oldFileExists).toBe(false);
+            
+            // Verify new file exists
+            const newFileExists = await fs.promises.access(newFile)
+                .then(() => true)
+                .catch(() => false);
+            expect(newFileExists).toBe(true);
+        });
+
+        it('should not list UserServiceTests.cs as having directory structure issue after fixing', () => {
+            const userServiceIssue = jsonOutputAfterFix.filesWithIssues.find(
+                (issue: any) => issue.testName === 'UserServiceTests.cs'
+            );
+            
+            // File might still have other issues (like naming), but should not have directory structure issues
+            if (userServiceIssue) {
+                const hasDirectoryIssue = userServiceIssue.errors.some(
+                    (error: any) => error.type === 'InvalidDirectoryStructure'
+                );
+                expect(hasDirectoryIssue).toBe(false);
+            }
+        });
+
+        it('should have fewer issues after fixing', () => {
+            // Original scenario 1 had 7 issues, after fixing directory structures should have fewer
+            expect(jsonOutputAfterFix.summary.totalFilesWithIssues).toBeLessThan(7);
+        });
+    });
+
+    describe('Scenario 4: --fix to rename wrong file name (incorrect casing)', () => {
+        const tempDir = `test-data-temp-${Date.now()}`;
+        let jsonOutputAfterFix: any;
+
+        const serviceFolder = 'Application.Tests/Services';
+        const newFileName = 'UpercaseXYZServiceTests.cs';
+        const oldFileName = 'UpercaseXyzServiceTests.cs';
+        const oldFilePath = `${tempDir}/tests/${serviceFolder}/${oldFileName}`;
+        const newFilePath = `${tempDir}/tests/${serviceFolder}/${newFileName}`;
+
+        beforeAll(async () => {
+            // Create temporary copy of test-data
+            await fs.promises.cp('test-data', tempDir, { recursive: true });
+            
+            // Run CLI with --fix on the temporary copy to rename the file
+            await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n --fix ${tempDir}/tests/Application.Tests/Services/UpercaseXyzServiceTests.cs`);
+            
+            // Run analysis again to get the result after fixing
+            const resultAfterFix = await executeCLI(`-s ./${tempDir}/src/ -t ./${tempDir}/tests/ -d -n`);
+            jsonOutputAfterFix = resultAfterFix.jsonOutput;
+        }, 15000);
+
+        afterAll(async () => {
+            // Clean up temporary directory
+            await fs.promises.rm(tempDir, { recursive: true, force: true });
+        });
+
+        it('should have fewer issues after fixing', () => {
+            // Original scenario 1 had 7 issues, after fixing file name should have fewer
+            expect(jsonOutputAfterFix.summary.totalFilesWithIssues).toBe(6);
+        });
+
+        // Note: This test is case-sensitivity dependent and may behave differently on case-insensitive file systems (e.g., Windows default)
+        it('old file UpercaseXyzServiceTests.cs should not exist', async () => {
+
+            const oldFileExists = fs.readdirSync(`${tempDir}/tests/Application.Tests/Services`).includes('UpercaseXyzServiceTests.cs');
+            expect(oldFileExists).toBe(false);
+        });
+
+        it('new file UpercaseXYZServiceTests.cs should exist', async () => {
+
+            // Verify new file exists
+            const newFileExists = await fs.promises.access(newFilePath)
+                .then(() => true)
+                .catch(() => false);
+            expect(newFileExists).toBe(true);
+        });
+
+        it('UpercaseXYZServiceTests.cs should not be in issues', () => {
+            const hasIssue = (fileName: string) =>
+                jsonOutputAfterFix.filesWithIssues.some((issue: any) => issue.testName === fileName);
+            expect(hasIssue('UpercaseXYZServiceTests.cs')).toBe(false);
+        });
+
+        it('should update class name from "UpercaseXyzServiceTests" to "UpercaseXYZServiceTests" in file content', async () => {
+            const content = await fs.promises.readFile(newFilePath, 'utf-8');
+            
+            // Check that the new class name exists
+            expect(content).toContain('public class UpercaseXYZServiceTests');
+            
+            // Check that the old class name does NOT exist
+            expect(content).not.toContain('public class UpercaseXyzServiceTests');
+        });
+
+        it('should update ALL occurrences of the old class name in the file', async () => {
+            const content = await fs.promises.readFile(newFilePath, 'utf-8');
+            
+            // Count occurrences of old class name (should be 0)
+            const oldClassNameMatches = content.match(/\bUpercaseXyzServiceTests\b/g);
+            expect(oldClassNameMatches).toBeNull();
+            
+            // Verify new class name exists at least once (the class declaration)
+            const newClassNameMatches = content.match(/\bUpercaseXYZServiceTests\b/g);
+            expect(newClassNameMatches).not.toBeNull();
+            expect(newClassNameMatches!.length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('should preserve file structure and other content when updating class name', async () => {
+            const content = await fs.promises.readFile(newFilePath, 'utf-8');
+            
+            // Verify namespace is preserved
+            expect(content).toContain('namespace Application.Tests.Services');
+            
+            // Verify attributes are preserved
+            expect(content).toContain('[TestClass]');
+            expect(content).toContain('[TestMethod]');
+            
+            // Verify method names are preserved
+            expect(content).toContain('DoSomething_Should_DoSomething');
+            
+            // Verify the service reference is preserved (should NOT be changed)
+            expect(content).toContain('new UpercaseXYZService()');
+        });
+    });
 });

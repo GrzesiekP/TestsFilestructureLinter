@@ -1,0 +1,2 @@
+// This test is for Application.Handlers.Truck.CommandHandlers tests. Although there are more tests called the same, they are in different namespaces and refer to different Handler in different namespace.
+// It should not be recognized as error.

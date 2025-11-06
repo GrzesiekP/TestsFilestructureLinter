@@ -2,8 +2,8 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import {
   AnalysisError,
   AnalysisErrorType,
@@ -15,10 +15,9 @@ import { ConsoleReporter } from './console-reporter';
 import { Analyzer } from './analyzer';
 import { Fixer } from './fixer';
 import { generateJsonReport } from './json-reporter';
-const { MultiSelect } = require('enquirer');
 
 // Import package.json for version information
-const packageJson = require('../package.json');
+import packageJson from '../package.json';
 
 const program = new Command();
 
@@ -154,7 +153,7 @@ program
           const fixableFiles = results.filter((r: AnalysisResult) =>
             r.errors.some(
               (e: AnalysisError) =>
-                e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+                (e.type === AnalysisErrorType.InvalidDirectoryStructure || e.type === AnalysisErrorType.InvalidFileName) &&
                 e.actualTestPath &&
                 e.expectedTestPath &&
                 e.sourceFilePath,
@@ -179,13 +178,13 @@ program
 
               console.log(chalk.cyan(`\nPage ${currentPage + 1} of ${totalPages}`));
 
-              const prompt = new MultiSelect({
+              const prompt = new (require('enquirer').MultiSelect)({
                 name: 'files',
                 message: chalk.cyan('Select files to fix'),
                 hint: '(Use arrow keys and space to select, enter to confirm)',
                 choices: currentFiles.map((file: AnalysisResult) => {
                   const error = file.errors.find(
-                    (e: AnalysisError) => e.type === AnalysisErrorType.InvalidDirectoryStructure,
+                    (e: AnalysisError) => e.type === AnalysisErrorType.InvalidDirectoryStructure || e.type === AnalysisErrorType.InvalidFileName,
                   );
                   const currentPath = path.relative(testRoot, file.testFilePath);
                   const targetPath = error?.expectedTestPath
@@ -226,9 +225,16 @@ program
               currentPage++;
             }
           } catch (err) {
-            // User canceled the selection
-            console.log(chalk.gray('\nSelection canceled.'));
-            process.exit(0);
+            // Check if this is a user cancellation
+            // Enquirer throws an empty string when user cancels with Ctrl+C or ESC
+            if (err === '') {
+              console.log(chalk.gray('\nSelection canceled.'));
+              process.exit(0);
+            }
+            
+            // Handle unexpected errors - log and re-throw
+            console.error(chalk.red('Error during file selection:'), err);
+            throw err;
           }
 
           if (!selectedPaths || selectedPaths.length === 0) {

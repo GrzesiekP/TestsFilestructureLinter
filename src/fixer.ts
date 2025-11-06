@@ -1,5 +1,5 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { AnalysisResult, AnalysisError, AnalysisErrorType, AnalyzerOptions } from './types';
 
 export interface FixOptions {
@@ -32,24 +32,32 @@ export class Fixer {
   ): Promise<void> {
     for (const result of results) {
       for (const error of result.errors) {
-        switch (error.type) {
-          case AnalysisErrorType.MissingTest:
-            if (options.createMissingFiles) {
-              await this.createMissingTestFile(result.testFilePath);
-            }
-            break;
-          case AnalysisErrorType.InvalidFileName:
-            if (options.renameInvalidFiles) {
-              await this.renameInvalidTestFile(result.testFilePath);
-            }
-            break;
-          case AnalysisErrorType.InvalidDirectoryStructure:
-            if (options.moveFiles) {
-              await this.moveTestFile(error, []);
-            }
-            break;
-        }
+        await this.handleErrorFix(error, result.testFilePath, options);
       }
+    }
+  }
+
+  private async handleErrorFix(
+    error: AnalysisError,
+    testFilePath: string,
+    options: FixOptions,
+  ): Promise<void> {
+    switch (error.type) {
+      case AnalysisErrorType.MissingTest:
+        if (options.createMissingFiles) {
+          await this.createMissingTestFile(testFilePath);
+        }
+        break;
+      case AnalysisErrorType.InvalidFileName:
+        if (options.renameInvalidFiles) {
+          await this.renameInvalidTestFile(error, []);
+        }
+        break;
+      case AnalysisErrorType.InvalidDirectoryStructure:
+        if (options.moveFiles) {
+          await this.moveTestFile(error, []);
+        }
+        break;
     }
   }
 
@@ -58,9 +66,50 @@ export class Fixer {
     throw new Error('Not implemented');
   }
 
-  private renameInvalidTestFile(testPath: string): Promise<void> {
-    // Implementation for renaming invalid test files
-    throw new Error('Not implemented');
+  private async renameInvalidTestFile(
+    error: AnalysisError,
+    fixedFiles: FixResult[],
+  ): Promise<void> {
+    if (!error.actualTestPath || !error.expectedTestPath) {
+      console.log('[DEBUG] Missing paths, returning early');
+      return;
+    }
+
+    const actualPath = error.actualTestPath;
+    const expectedPath = error.expectedTestPath;
+
+    // Read the file content before renaming
+    const content = await fs.readFile(actualPath, 'utf8');
+
+    // Extract class names from filenames (without extension)
+    const oldClassName = path.basename(actualPath, path.extname(actualPath));
+    const newClassName = path.basename(expectedPath, path.extname(expectedPath));
+
+    // Replace all occurrences of the old class name with the new class name
+    const updatedContent = this.updateClassName(content, oldClassName, newClassName);
+
+    // Check if paths differ only in case (case-sensitive rename needed on Windows)
+    if (actualPath.toLowerCase() === expectedPath.toLowerCase()) {
+      // Two-step rename for case-only changes
+      const tempPath = path.join(
+        path.dirname(actualPath),
+        `temp_${Date.now()}_${path.basename(expectedPath)}`,
+      );
+      await fs.rename(actualPath, tempPath);
+      await fs.writeFile(expectedPath, updatedContent);
+      await fs.unlink(tempPath);
+    } else {
+      // Direct rename: write to new location and delete old file
+      await fs.writeFile(expectedPath, updatedContent);
+      await fs.unlink(actualPath);
+    }
+
+    console.log(`Renamed: ${error.actualTestPath} → ${error.expectedTestPath}`);
+
+    fixedFiles.push({
+      from: actualPath,
+      to: expectedPath,
+    });
   }
 
   async isFixable(testFilePath: string, results: AnalysisResult[]): Promise<FixableResult> {
@@ -73,10 +122,11 @@ export class Fixer {
       };
     }
 
-    // Check if it has a directory structure error that can be fixed
+    // Check if it has a directory structure or filename error that can be fixed
     const error = result.errors.find(
       (e) =>
-        e.type === AnalysisErrorType.InvalidDirectoryStructure &&
+        (e.type === AnalysisErrorType.InvalidDirectoryStructure ||
+         e.type === AnalysisErrorType.InvalidFileName) &&
         e.actualTestPath &&
         e.expectedTestPath &&
         e.sourceFilePath,
@@ -85,7 +135,7 @@ export class Fixer {
     if (!error) {
       return {
         isFixable: false,
-        error: 'File has no fixable directory structure issues',
+        error: 'File has no fixable directory structure or filename issues',
       };
     }
 
@@ -93,7 +143,11 @@ export class Fixer {
       isFixable: true,
       fix: async () => {
         const fixedFiles: FixResult[] = [];
-        await this.moveTestFile(error, fixedFiles);
+        if (error.type === AnalysisErrorType.InvalidFileName) {
+          await this.renameInvalidTestFile(error, fixedFiles);
+        } else {
+          await this.moveTestFile(error, fixedFiles);
+        }
         return fixedFiles[0];
       },
     };
@@ -107,24 +161,31 @@ export class Fixer {
 
     for (const result of results) {
       for (const error of result.errors) {
-        if (
-          error.type === AnalysisErrorType.InvalidDirectoryStructure &&
-          error.actualTestPath &&
-          error.expectedTestPath &&
-          error.sourceFilePath
-        ) {
-          try {
-            await this.moveTestFile(error, fixedFiles);
-          } catch (err) {
-            console.error(
-              `Failed to fix ${error.actualTestPath}: ${err instanceof Error ? err.message : 'Unknown error'}`,
-            );
-          }
-        }
+        await this.tryFixDirectoryError(error, fixedFiles);
       }
     }
 
     return fixedFiles;
+  }
+
+  private async tryFixDirectoryError(
+    error: AnalysisError,
+    fixedFiles: FixResult[],
+  ): Promise<void> {
+    if (error.type !== AnalysisErrorType.InvalidDirectoryStructure) {
+      return;
+    }
+
+    if (!error.actualTestPath || !error.expectedTestPath || !error.sourceFilePath) {
+      return;
+    }
+
+    try {
+      await this.moveTestFile(error, fixedFiles);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`Failed to fix ${error.actualTestPath}: ${errorMessage}`);
+    }
   }
 
   async moveTestFile(error: AnalysisError, fixedFiles: FixResult[]): Promise<void> {
@@ -174,6 +235,17 @@ export class Fixer {
     return content;
   }
 
+  private updateClassName(content: string, oldClassName: string, newClassName: string): string {
+    // Only replace if class names are different
+    if (oldClassName === newClassName) {
+      return content;
+    }
+
+    // Use word boundary to match whole class name only
+    const classNameRegex = new RegExp(`\\b${this.escapeRegExp(oldClassName)}\\b`, 'g');
+    return content.replace(classNameRegex, newClassName);
+  }
+
   private extractNamespaceFromPath(filePath: string): string | null {
     const parts = path.dirname(filePath).split(path.sep);
     const testIndex = parts.findIndex((p) => p.endsWith('.Tests'));
@@ -186,6 +258,6 @@ export class Fixer {
   }
 
   private escapeRegExp(string: string): string {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return string.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   }
 }
