@@ -5,18 +5,21 @@
       "type": "node",
       "request": "launch",
       "name": "Debug CLI Test",
-      "program": "${workspaceFolder}/node_modules/jest/bin/jest",
+      "program": "${workspaceFolder}/node_modules/jest/bin/jest.js",
       "args": [
+        "--runInBand",
+        "--no-cache",
         "--config",
         "${workspaceFolder}/jest.config.js",
-        "--testMatch",
-        "**/tests/**/*.test.ts",
-        "--runInBand",
         "tests/cli.test.ts"
       ],
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
-      "disableOptimisticBPs": true
+      "sourceMaps": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
     },
     {
       "type": "node",
@@ -33,6 +36,6 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen"
-    },
+    }
   ]
-} 
+}
