@@ -23,6 +23,6 @@ module.exports = {
   ignorePatterns: ['node_modules/**', 'dist/**', 'coverage/**', 'test-data/**', '**/*.d.ts', 'tests/**'],
   env: {
     node: true,
-    es6: true,
+    es2021: true,
   },
 }; 

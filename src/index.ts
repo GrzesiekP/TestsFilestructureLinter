@@ -44,7 +44,7 @@ program
       if (!val) return DEFAULT_OPTIONS.ignoreDirectories;
       // Handle quoted values properly by replacing quotes and splitting by comma
       return val
-        .replace(/["']/g, '')
+        .replaceAll(/["']/g, '')
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
@@ -54,7 +54,7 @@ program
     if (!val) return DEFAULT_OPTIONS.ignoreFiles;
     // Handle quoted values properly by replacing quotes and splitting by comma
     return val
-      .replace(/["']/g, '')
+      .replaceAll(/["']/g, '')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
@@ -74,7 +74,6 @@ program
       console.log(chalk.gray('\nPaths:'));
       console.log(chalk.gray(`Source root: ${srcRoot}`));
       console.log(chalk.gray(`Test root: ${testRoot}`));
-
 
       const analyzerOptions: AnalyzerOptions = {
         srcRoot,
@@ -100,35 +99,37 @@ program
         try {
           const jsonReport = generateJsonReport(results, totalFiles);
           let outputPath: string;
-          
+
           if (typeof options.output === 'string') {
             // Path was provided
             outputPath = path.resolve(options.output);
           } else {
             // No path provided, use default
             const now = new Date();
-            const datetime = now.getFullYear() +
+            const datetime =
+              now.getFullYear() +
               String(now.getMonth() + 1).padStart(2, '0') +
-              String(now.getDate()).padStart(2, '0') + '-' +
+              String(now.getDate()).padStart(2, '0') +
+              '-' +
               String(now.getHours()).padStart(2, '0') +
               String(now.getMinutes()).padStart(2, '0') +
               String(now.getSeconds()).padStart(2, '0');
             outputPath = path.resolve(`test-filestructure-linter-output/results-${datetime}.json`);
           }
-          
+
           // Create parent directories if they don't exist
           const outputDir = path.dirname(outputPath);
           if (!fs.existsSync(outputDir)) {
             fs.mkdirSync(outputDir, { recursive: true });
           }
-          
+
           // Write JSON report to file
           fs.writeFileSync(outputPath, jsonReport, 'utf-8');
           console.log(chalk.green(`\nJSON report saved to: ${outputPath}`));
         } catch (error) {
           console.error(
             chalk.red('\nError writing JSON report:'),
-            error instanceof Error ? error.message : 'Unknown error'
+            error instanceof Error ? error.message : 'Unknown error',
           );
         }
       }
@@ -153,7 +154,8 @@ program
           const fixableFiles = results.filter((r: AnalysisResult) =>
             r.errors.some(
               (e: AnalysisError) =>
-                (e.type === AnalysisErrorType.InvalidDirectoryStructure || e.type === AnalysisErrorType.InvalidFileName) &&
+                (e.type === AnalysisErrorType.InvalidDirectoryStructure ||
+                  e.type === AnalysisErrorType.InvalidFileName) &&
                 e.actualTestPath &&
                 e.expectedTestPath &&
                 e.sourceFilePath,
@@ -184,7 +186,9 @@ program
                 hint: '(Use arrow keys and space to select, enter to confirm)',
                 choices: currentFiles.map((file: AnalysisResult) => {
                   const error = file.errors.find(
-                    (e: AnalysisError) => e.type === AnalysisErrorType.InvalidDirectoryStructure || e.type === AnalysisErrorType.InvalidFileName,
+                    (e: AnalysisError) =>
+                      e.type === AnalysisErrorType.InvalidDirectoryStructure ||
+                      e.type === AnalysisErrorType.InvalidFileName,
                   );
                   const currentPath = path.relative(testRoot, file.testFilePath);
                   const targetPath = error?.expectedTestPath
@@ -231,7 +235,7 @@ program
               console.log(chalk.gray('\nSelection canceled.'));
               process.exit(0);
             }
-            
+
             // Handle unexpected errors - log and re-throw
             console.error(chalk.red('Error during file selection:'), err);
             throw err;

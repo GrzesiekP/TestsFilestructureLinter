@@ -126,7 +126,7 @@ export class Fixer {
     const error = result.errors.find(
       (e) =>
         (e.type === AnalysisErrorType.InvalidDirectoryStructure ||
-         e.type === AnalysisErrorType.InvalidFileName) &&
+          e.type === AnalysisErrorType.InvalidFileName) &&
         e.actualTestPath &&
         e.expectedTestPath &&
         e.sourceFilePath,
@@ -168,10 +168,7 @@ export class Fixer {
     return fixedFiles;
   }
 
-  private async tryFixDirectoryError(
-    error: AnalysisError,
-    fixedFiles: FixResult[],
-  ): Promise<void> {
+  private async tryFixDirectoryError(error: AnalysisError, fixedFiles: FixResult[]): Promise<void> {
     if (error.type !== AnalysisErrorType.InvalidDirectoryStructure) {
       return;
     }
@@ -258,6 +255,6 @@ export class Fixer {
   }
 
   private escapeRegExp(string: string): string {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+    return string.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   }
 }
