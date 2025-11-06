@@ -23,13 +23,14 @@ export class Analyzer {
       ignoreFiles: options.ignoreFiles ?? DEFAULT_OPTIONS.ignoreFiles,
     };
 
+      const normalizedIgnoreFiles = new Set(mergedOptions.ignoreFiles.map((f) => f.toLowerCase()));
     // Find all test files - always pass the ignore configurations
     const testFiles = await this.findTestFiles(
       mergedOptions.testRoot,
       mergedOptions.fileExtension,
       mergedOptions.testFileSuffix,
       mergedOptions.ignoreDirectories,
-      mergedOptions.ignoreFiles,
+      normalizedIgnoreFiles,
       mergedOptions.testProjectSuffix,
     );
 
@@ -37,7 +38,7 @@ export class Analyzer {
       mergedOptions.srcRoot,
       mergedOptions.fileExtension,
       mergedOptions.ignoreDirectories,
-      mergedOptions.ignoreFiles,
+      normalizedIgnoreFiles,
     );
 
     const results: AnalysisResult[] = [];
@@ -224,7 +225,7 @@ export class Analyzer {
     extension: string,
     testFileSuffix: string,
     ignoreDirectories: string[] = [],
-    ignoreFiles: string[] = [],
+    normalizedIgnoreFiles: Set<string> = new Set<string>(),
     testProjectSuffix: string = '.Tests',
   ): Promise<string[]> {
     try {
@@ -246,9 +247,6 @@ export class Analyzer {
           },
         );
       });
-
-      // Normalize the ignored files list for easier comparison
-      const normalizedIgnoreFiles = ignoreFiles.map((f) => f.toLowerCase());
 
       return files
         .map((f: string) => path.resolve(f))
@@ -272,7 +270,7 @@ export class Analyzer {
           }
 
           // Skip ignored files - case insensitive comparison
-          if (normalizedIgnoreFiles.includes(fileName.toLowerCase())) {
+          if (normalizedIgnoreFiles.has(fileName.toLowerCase())) {
             return false;
           }
 
@@ -308,7 +306,7 @@ export class Analyzer {
     dir: string,
     extension: string,
     ignoreDirectories: string[] = [],
-    ignoreFiles: string[] = [],
+    normalizedIgnoreFiles: Set<string> = new Set<string>(),
   ): Promise<string[]> {
     try {
       // Create glob ignore patterns from ignore directories and files
@@ -330,9 +328,6 @@ export class Analyzer {
         );
       });
 
-      // Normalize the ignored files list for easier comparison
-      const normalizedIgnoreFiles = ignoreFiles.map((f) => f.toLowerCase());
-
       return files
         .map((f: string) => path.resolve(f))
         .filter((f: string) => {
@@ -349,7 +344,7 @@ export class Analyzer {
 
           // Skip ignored files - case insensitive comparison
           const fileName = path.basename(f);
-          if (normalizedIgnoreFiles.includes(fileName.toLowerCase())) {
+          if (normalizedIgnoreFiles.has(fileName.toLowerCase())) {
             return false;
           }
 
@@ -364,11 +359,11 @@ export class Analyzer {
   createSourceFileMap(sourceFiles: string[], extension: string): Map<string, string[]> {
     const sourceMap = new Map<string, string[]>();
 
-    sourceFiles.forEach((file) => {
+    for (const file of sourceFiles) {
       const baseName = path.basename(file, extension).toLowerCase();
       const existingPaths = sourceMap.get(baseName) || [];
       sourceMap.set(baseName, [...existingPaths, file]);
-    });
+    };
 
     return sourceMap;
   }
@@ -423,15 +418,15 @@ export class Analyzer {
         // Get the relative path of the test file
         const relativeTestPath = path.relative(options.testRoot, testFilePath);
         const testDirPath = path.dirname(relativeTestPath);
-        const testDirSegments = testDirPath.split(/[\/\\]/);
-        const lastTestDirSegment = testDirSegments[testDirSegments.length - 1];
+        const testDirSegments = testDirPath.split(/[/\\]/);
+        const lastTestDirSegment = testDirSegments.at(-1);
 
         // Try to find a source file with matching subdirectory structure
         const matchingSourceByDir = matchingSourceFiles.find((file) => {
           const relativeSourcePath = path.relative(options.srcRoot, file);
           const sourceDirPath = path.dirname(relativeSourcePath);
-          const sourceDirSegments = sourceDirPath.split(/[\/\\]/);
-          const lastSourceDirSegment = sourceDirSegments[sourceDirSegments.length - 1];
+          const sourceDirSegments = sourceDirPath.split(/[/\\]/);
+          const lastSourceDirSegment = sourceDirSegments.at(-1);
 
           return (
             lastSourceDirSegment &&
