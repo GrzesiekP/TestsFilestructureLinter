@@ -1,23 +1,34 @@
 import chalk from 'chalk';
 import { AnalysisResult, AnalysisErrorType } from './types';
-import * as path from 'path';
+import * as path from 'node:path';
 
 export class ConsoleReporter {
   reportResults(results: AnalysisResult[], totalFiles: number, isInteractive = false): void {
     if (results.length === 0) {
-      console.log(chalk.green('\n✓ No issues found'));
-      console.log(chalk.gray(`\n📊 Total files analyzed: ${chalk.white(totalFiles)}`));
+      this.reportNoIssues(totalFiles);
       return;
     }
 
     if (isInteractive) {
-      // In interactive mode, don't show the full report
       return;
     }
 
     console.log(chalk.yellow(`\n! Found ${results.length} files with issues:\n`));
 
-    // Group errors by type
+    const errorCounts = this.processAndDisplayResults(results);
+    this.displaySummary(errorCounts, results.length, totalFiles);
+  }
+
+  private reportNoIssues(totalFiles: number): void {
+    console.log(chalk.green('\n✓ No issues found'));
+    console.log(chalk.gray(`\n📊 Total files analyzed: ${chalk.white(totalFiles)}`));
+  }
+
+  private processAndDisplayResults(results: AnalysisResult[]): {
+    directoryStructure: number;
+    filename: number;
+    missingTests: number;
+  } {
     const errorCounts = {
       directoryStructure: 0,
       filename: 0,
@@ -26,137 +37,97 @@ export class ConsoleReporter {
 
     for (const result of results) {
       console.log(chalk.white(result.testFile));
-      for (const error of result.errors) {
-        console.log(chalk.red(`  ${error.type}`));
-
-        // Count error types
-        if (error.type === AnalysisErrorType.InvalidDirectoryStructure) {
-          errorCounts.directoryStructure++;
-        } else if (error.type === AnalysisErrorType.InvalidFileName) {
-          errorCounts.filename++;
-        } else if (error.type === AnalysisErrorType.MissingTest) {
-          errorCounts.missingTests++;
-        }
-
-        if (error.type === AnalysisErrorType.InvalidDirectoryStructure && error.sourceFilePath) {
-          const paths = [error.sourceFilePath];
-          if (error.actualTestPath) paths.push(error.actualTestPath);
-          if (error.expectedTestPath) paths.push(error.expectedTestPath);
-          const commonBasePath = this.getCommonBasePath(paths);
-
-          // Check if we have multiple source files
-          if (error.sourceFilePath.includes(',')) {
-            const sourceFiles = error.sourceFilePath.split(',').map((p) => p.trim());
-            console.log(chalk.gray(`  📄 Source:   Multiple source files found:`));
-            for (const sourcePath of sourceFiles) {
-              // Ensure path starts with ./src
-              const sourceRelative = this.formatToStandardPath(sourcePath, 'src');
-              console.log(chalk.gray(`    - ${sourceRelative}`));
-            }
-
-            // Display current test file location
-            if (error.actualTestPath) {
-              // Ensure path starts with ./tests
-              const actualRelative = this.formatToStandardPath(error.actualTestPath, 'tests');
-              console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
-            }
-          } else {
-            const sourceRelative = this.getRelativePath(error.sourceFilePath, commonBasePath);
-            console.log(chalk.gray(`  📄 Source:   ${sourceRelative}`));
-          }
-
-          if (error.actualTestPath && error.expectedTestPath) {
-            const incorrectSegment = this.extractIncorrectSegment(error.message);
-            const actualRelative = this.getRelativePath(error.actualTestPath, commonBasePath);
-            const expectedRelative = this.getRelativePath(error.expectedTestPath, commonBasePath);
-
-            if (incorrectSegment) {
-              const highlightedPath = this.highlightIncorrectSegment(
-                actualRelative,
-                incorrectSegment,
-              );
-              console.log(chalk.gray(`  🧪 Current:  `) + highlightedPath);
-              console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
-            } else {
-              console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
-              console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
-            }
-          }
-        } else if (error.type === AnalysisErrorType.InvalidDirectoryStructure) {
-          // For directory structure errors without source files
-          if (error.actualTestPath) {
-            // Ensure path starts with ./tests
-            const actualRelative = this.formatToStandardPath(error.actualTestPath, 'tests');
-            console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
-          } else if (result.testFilePath) {
-            // Use the result's test file path if actualTestPath is not available
-            // Ensure path starts with ./tests
-            const testPath = this.formatToStandardPath(result.testFilePath, 'tests');
-            console.log(chalk.gray(`  🧪 Current:  ${testPath}`));
-          }
-        } else if (error.type === AnalysisErrorType.MissingTest) {
-          const sourceFile = error.message.match(/source file: (.+)$/)?.[1];
-          if (sourceFile) {
-            const sourceRelative = this.getRelativePath(
-              sourceFile,
-              result.testRoot ? path.dirname(result.testRoot) : undefined,
-            );
-            console.log(chalk.gray(`  📄 Source:   ${sourceRelative}`));
-            console.log(chalk.gray(`  🧪 Missing test file`));
-          } else {
-            console.log(chalk.gray(`  🧪 ${error.message}`));
-          }
-        } else if (error.type === AnalysisErrorType.InvalidFileName && error.sourceFilePath) {
-          const paths = [error.sourceFilePath];
-          if (error.actualTestPath) paths.push(error.actualTestPath);
-          if (error.expectedTestPath) paths.push(error.expectedTestPath);
-          const commonBasePath = this.getCommonBasePath(paths);
-
-          // Check if we have multiple source files
-          if (error.sourceFilePath.includes(',')) {
-            const sourceFiles = error.sourceFilePath.split(',').map((p) => p.trim());
-            console.log(chalk.gray(`  📄 Source:   Multiple source files found:`));
-            for (const sourcePath of sourceFiles) {
-              // Ensure path starts with ./src
-              const sourceRelative = this.formatToStandardPath(sourcePath, 'src');
-              console.log(chalk.gray(`    - ${sourceRelative}`));
-            }
-
-            // Display current test file location
-            if (error.actualTestPath) {
-              // Ensure path starts with ./tests
-              const actualRelative = this.formatToStandardPath(error.actualTestPath, 'tests');
-              console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
-            }
-          } else {
-            const sourceRelative = this.getRelativePath(error.sourceFilePath, commonBasePath);
-            console.log(chalk.gray(`  📄 Source:   ${sourceRelative}`));
-          }
-
-          if (error.actualTestPath && error.expectedTestPath) {
-            const incorrectSegment = this.extractIncorrectSegment(error.message);
-            const actualRelative = this.getRelativePath(error.actualTestPath, commonBasePath);
-            const expectedRelative = this.getRelativePath(error.expectedTestPath, commonBasePath);
-
-            if (incorrectSegment) {
-              const highlightedPath = this.highlightIncorrectSegment(
-                actualRelative,
-                incorrectSegment,
-              );
-              console.log(chalk.gray(`  🧪 Current:  `) + highlightedPath);
-              console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
-            } else {
-              console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
-              console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
-            }
-          }
-        }
-      }
+      this.processResultErrors(result, errorCounts);
       console.log('');
     }
 
-    // Print summary
+    return errorCounts;
+  }
+
+  private processResultErrors(
+    result: AnalysisResult,
+    errorCounts: { directoryStructure: number; filename: number; missingTests: number },
+  ): void {
+    for (const error of result.errors) {
+      console.log(chalk.red(`  ${error.type}`));
+      this.updateErrorCounts(error.type, errorCounts);
+      this.displayErrorDetails(error, result);
+    }
+  }
+
+  private updateErrorCounts(
+    errorType: AnalysisErrorType,
+    errorCounts: { directoryStructure: number; filename: number; missingTests: number },
+  ): void {
+    if (errorType === AnalysisErrorType.InvalidDirectoryStructure) {
+      errorCounts.directoryStructure++;
+    } else if (errorType === AnalysisErrorType.InvalidFileName) {
+      errorCounts.filename++;
+    } else if (errorType === AnalysisErrorType.MissingTest) {
+      errorCounts.missingTests++;
+    }
+  }
+
+  private displayErrorDetails(
+    error: {
+      type: AnalysisErrorType;
+      sourceFilePath?: string;
+      actualTestPath?: string;
+      expectedTestPath?: string;
+      message: string;
+    },
+    result: AnalysisResult,
+  ): void {
+    const isStructureOrFilenameError =
+      error.type === AnalysisErrorType.InvalidDirectoryStructure ||
+      error.type === AnalysisErrorType.InvalidFileName;
+
+    if (isStructureOrFilenameError && error.sourceFilePath) {
+      this.displaySourceAndTestPaths(error);
+    } else if (error.type === AnalysisErrorType.InvalidDirectoryStructure) {
+      this.displayDirectoryStructureError(error, result);
+    } else if (error.type === AnalysisErrorType.MissingTest) {
+      this.displayMissingTestError(error, result);
+    }
+  }
+
+  private displayDirectoryStructureError(
+    error: { actualTestPath?: string; message: string },
+    result: AnalysisResult,
+  ): void {
+    if (error.actualTestPath) {
+      const actualRelative = this.formatToStandardPath(error.actualTestPath, 'tests');
+      console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
+    } else if (result.testFilePath) {
+      const testPath = this.formatToStandardPath(result.testFilePath, 'tests');
+      console.log(chalk.gray(`  🧪 Current:  ${testPath}`));
+    }
+  }
+
+  private displayMissingTestError(
+    error: { message: string },
+    result: AnalysisResult,
+  ): void {
+    const sourceFile = new RegExp(/source file: (.+)$/).exec(error.message)?.[1];
+    if (sourceFile) {
+      const sourceRelative = this.getRelativePath(
+        sourceFile,
+        result.testRoot ? path.dirname(result.testRoot) : undefined,
+      );
+      console.log(chalk.gray(`  📄 Source:   ${sourceRelative}`));
+      console.log(chalk.gray(`  🧪 Missing test file`));
+    } else {
+      console.log(chalk.gray(`  🧪 ${error.message}`));
+    }
+  }
+
+  private displaySummary(
+    errorCounts: { directoryStructure: number; filename: number; missingTests: number },
+    totalIssues: number,
+    totalFiles: number,
+  ): void {
     console.log(chalk.bold('\nSummary:'));
+
     if (errorCounts.directoryStructure > 0) {
       console.log(
         chalk.gray(
@@ -170,11 +141,64 @@ export class ConsoleReporter {
     if (errorCounts.missingTests > 0) {
       console.log(chalk.gray(`  ❓ Missing tests: ${chalk.yellow(errorCounts.missingTests)}`));
     }
-    console.log(chalk.gray(`  📊 Total files with issues: ${chalk.yellow(results.length)}`));
+
+    console.log(chalk.gray(`  📊 Total files with issues: ${chalk.yellow(totalIssues)}`));
     console.log(chalk.gray(`  📊 Total files analyzed: ${chalk.white(totalFiles)}`));
+
     if (totalFiles > 0) {
-      const percentage = ((results.length / totalFiles) * 100).toFixed(1);
+      const percentage = ((totalIssues / totalFiles) * 100).toFixed(1);
       console.log(chalk.gray(`  📈 Issue rate: ${chalk.yellow(percentage)}%`));
+    }
+  }
+
+  private displaySourceAndTestPaths(error: {
+    sourceFilePath?: string;
+    actualTestPath?: string;
+    expectedTestPath?: string;
+    message: string;
+  }): void {
+    const paths = [error.sourceFilePath!];
+    if (error.actualTestPath) paths.push(error.actualTestPath);
+    if (error.expectedTestPath) paths.push(error.expectedTestPath);
+    const commonBasePath = this.getCommonBasePath(paths);
+
+    // Check if we have multiple source files
+    if (error.sourceFilePath!.includes(',')) {
+      const sourceFiles = error.sourceFilePath!.split(',').map((p) => p.trim());
+      console.log(chalk.gray(`  📄 Source:   Multiple source files found:`));
+      for (const sourcePath of sourceFiles) {
+        // Ensure path starts with ./src
+        const sourceRelative = this.formatToStandardPath(sourcePath, 'src');
+        console.log(chalk.gray(`    - ${sourceRelative}`));
+      }
+
+      // Display current test file location
+      if (error.actualTestPath) {
+        // Ensure path starts with ./tests
+        const actualRelative = this.formatToStandardPath(error.actualTestPath, 'tests');
+        console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
+      }
+    } else {
+      const sourceRelative = this.getRelativePath(error.sourceFilePath!, commonBasePath);
+      console.log(chalk.gray(`  📄 Source:   ${sourceRelative}`));
+    }
+
+    if (error.actualTestPath && error.expectedTestPath) {
+      const incorrectSegment = this.extractIncorrectSegment(error.message);
+      const actualRelative = this.getRelativePath(error.actualTestPath, commonBasePath);
+      const expectedRelative = this.getRelativePath(error.expectedTestPath, commonBasePath);
+
+      if (incorrectSegment) {
+        const highlightedPath = this.highlightIncorrectSegment(
+          actualRelative,
+          incorrectSegment,
+        );
+        console.log(chalk.gray(`  🧪 Current:  `) + highlightedPath);
+        console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
+      } else {
+        console.log(chalk.gray(`  🧪 Current:  ${actualRelative}`));
+        console.log(chalk.gray(`  ✨ Expected: ${expectedRelative}`));
+      }
     }
   }
 
@@ -258,7 +282,7 @@ export class ConsoleReporter {
     }
 
     // For paths with src or tests directories
-    const srcTestRegex = new RegExp(`(.*?)[\\\/](src|tests)[\\\/](.*)`);
+    const srcTestRegex = /(.*?)\/(src|tests)\/(.*)/;
     const srcTestMatch = srcTestRegex.exec(filePath);
     if (srcTestMatch) {
       // Convert backslashes to forward slashes
@@ -269,7 +293,7 @@ export class ConsoleReporter {
     // If we couldn't extract using the regex but the path contains 'test-data'
     if (filePath.includes('test-data')) {
       // This is likely a test path
-      const parts = filePath.split(/[\/\\]tests[\/\\]/);
+      const parts = filePath.split(/[/\\]tests[/\\]/);
       if (parts.length > 1) {
         return `./tests/${parts[1].replace(/\\/g, '/')}`;
       }

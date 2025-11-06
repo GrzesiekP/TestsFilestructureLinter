@@ -1,4 +1,4 @@
-import { AnalysisResult, AnalysisErrorType } from './types';
+import { AnalysisResult, AnalysisError, AnalysisErrorType } from './types';
 import * as path from 'node:path';
 
 interface JsonReportError {
@@ -26,60 +26,8 @@ interface JsonReport {
 }
 
 export function generateJsonReport(results: AnalysisResult[], totalFiles: number): string {
-  // Count error types
-  const errorCounts = {
-    directoryStructure: 0,
-    filename: 0,
-    missingTests: 0,
-  };
-
-  const filesWithIssues: JsonReportError[] = [];
-
-  for (const result of results) {
-    for (const error of result.errors) {
-      // Count error types
-      if (error.type === AnalysisErrorType.InvalidDirectoryStructure) {
-        errorCounts.directoryStructure++;
-      } else if (error.type === AnalysisErrorType.InvalidFileName) {
-        errorCounts.filename++;
-      } else if (error.type === AnalysisErrorType.MissingTest) {
-        errorCounts.missingTests++;
-      }
-
-      // Create error entry
-      const errorEntry: JsonReportError = {
-        testName: result.testFile,
-        issueType: error.type,
-      };
-
-      // Add current test file path - always include if available
-      if (error.actualTestPath) {
-        errorEntry.currentTestFile = formatToStandardPath(error.actualTestPath, 'tests');
-      }
-
-      // Add source files if available
-      if (error.sourceFilePath) {
-        // Handle multiple source files (comma-separated)
-        if (error.sourceFilePath.includes(',')) {
-          const sourceFiles = error.sourceFilePath.split(',').map((p) => p.trim());
-          errorEntry.sourceFiles = sourceFiles
-            .map((sourcePath) => formatToStandardPath(sourcePath, 'src'))
-            .join(', ');
-        } else {
-          errorEntry.sourceFiles = formatToStandardPath(error.sourceFilePath, 'src');
-        }
-      }
-
-      // Add expected test file path
-      if (error.expectedTestPath) {
-        errorEntry.expectedTestFile = formatToStandardPath(error.expectedTestPath, 'tests');
-      }
-
-      filesWithIssues.push(errorEntry);
-    }
-  }
-
-  // Calculate summary
+  const errorCounts = countErrorTypes(results);
+  const filesWithIssues = createFileIssuesList(results);
   const issueRate = totalFiles > 0 ? (results.length / totalFiles) * 100 : 0;
 
   const report: JsonReport = {
@@ -95,6 +43,89 @@ export function generateJsonReport(results: AnalysisResult[], totalFiles: number
   return JSON.stringify(report, null, 2);
 }
 
+function countErrorTypes(results: AnalysisResult[]): {
+  directoryStructure: number;
+  filename: number;
+  missingTests: number;
+} {
+  const counts = {
+    directoryStructure: 0,
+    filename: 0,
+    missingTests: 0,
+  };
+
+  for (const result of results) {
+    for (const error of result.errors) {
+      switch (error.type) {
+        case AnalysisErrorType.InvalidDirectoryStructure:
+          counts.directoryStructure++;
+          break;
+        case AnalysisErrorType.InvalidFileName:
+          counts.filename++;
+          break;
+        case AnalysisErrorType.MissingTest:
+          counts.missingTests++;
+          break;
+      }
+    }
+  }
+
+  return counts;
+}
+
+function createFileIssuesList(results: AnalysisResult[]): JsonReportError[] {
+  const issues: JsonReportError[] = [];
+
+  for (const result of results) {
+    for (const error of result.errors) {
+      const errorEntry = createErrorEntry(result.testFile, error);
+      issues.push(errorEntry);
+    }
+  }
+
+  return issues;
+}
+
+function createErrorEntry(testFile: string, error: AnalysisError): JsonReportError {
+  const errorEntry: JsonReportError = {
+    testName: testFile,
+    issueType: error.type,
+  };
+
+  addCurrentTestFile(errorEntry, error);
+  addSourceFiles(errorEntry, error);
+  addExpectedTestFile(errorEntry, error);
+
+  return errorEntry;
+}
+
+function addCurrentTestFile(errorEntry: JsonReportError, error: AnalysisError): void {
+  if (error.actualTestPath) {
+    errorEntry.currentTestFile = formatToStandardPath(error.actualTestPath, 'tests');
+  }
+}
+
+function addSourceFiles(errorEntry: JsonReportError, error: AnalysisError): void {
+  if (!error.sourceFilePath) {
+    return;
+  }
+
+  if (error.sourceFilePath.includes(',')) {
+    const sourceFiles = error.sourceFilePath.split(',').map((p: string) => p.trim());
+    errorEntry.sourceFiles = sourceFiles
+      .map((sourcePath: string) => formatToStandardPath(sourcePath, 'src'))
+      .join(', ');
+  } else {
+    errorEntry.sourceFiles = formatToStandardPath(error.sourceFilePath, 'src');
+  }
+}
+
+function addExpectedTestFile(errorEntry: JsonReportError, error: AnalysisError): void {
+  if (error.expectedTestPath) {
+    errorEntry.expectedTestFile = formatToStandardPath(error.expectedTestPath, 'tests');
+  }
+}
+
 // Helper function to format paths consistently (copied from console-reporter.ts)
 function formatToStandardPath(filePath: string, rootDir: 'src' | 'tests'): string {
   // If path already starts with ./src or ./tests, return it
@@ -103,7 +134,7 @@ function formatToStandardPath(filePath: string, rootDir: 'src' | 'tests'): strin
   }
 
   // For paths with src or tests directories
-  const srcTestRegex = /(.*?)[\/](src|tests)[\/](.*)/;
+  const srcTestRegex = /(.*?)[/](src|tests)[/](.*)/;
   const srcTestMatch = srcTestRegex.exec(filePath);
   if (srcTestMatch) {
     // Convert backslashes to forward slashes

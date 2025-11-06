@@ -45,132 +45,8 @@ export class Analyzer {
 
     // Process all test files
     for (const testFile of testFiles) {
-      const testFileName = path.basename(testFile, mergedOptions.fileExtension);
-      const sourceFileName = testFileName.replace(
-        new RegExp(`${mergedOptions.testFileSuffix}$`),
-        '',
-      );
-      const matchingSourceFiles = await this.findMatchingSourceFiles(
-        sourceFiles,
-        sourceFileName,
-        mergedOptions.fileExtension,
-      );
-
-      const result: AnalysisResult = {
-        testFile: path.basename(testFile),
-        testFilePath: path.resolve(testFile),
-        errors: [],
-      };
-
-      if (matchingSourceFiles.length === 0) {
-        result.errors.push({
-          type: AnalysisErrorType.InvalidDirectoryStructure,
-          message: `Source file not found: ${sourceFileName}${mergedOptions.fileExtension}`,
-          actualTestPath: testFile,
-        });
-      } else if (matchingSourceFiles.length > 1) {
-        // Try to find a matching source file based on subdirectory structure
-        const relativeTestPath = path.relative(mergedOptions.testRoot, testFile);
-        const testDirPath = path.dirname(relativeTestPath);
-        const testDirSegments = testDirPath.split(/[/\\]/);
-        const testProjectDirSegment = testDirSegments[0];
-        const testPathAfterProjectDir = testDirSegments.slice(1).join(path.sep);
-
-        // Try to find a source file with matching directory structure
-        const matchingSourceByDir = matchingSourceFiles.find((file) => {
-          const relativeSourcePath = path.relative(mergedOptions.srcRoot, file);
-          const sourceDirPath = path.dirname(relativeSourcePath);
-          const sourceDirSegments = sourceDirPath.split(/[/\\]/);
-          const sourceProjectDirSegment = sourceDirSegments[0];
-          const sourcePathAfterProjectDir = sourceDirSegments.slice(1).join(path.sep);
-
-          const isMatching =
-            sourceProjectDirSegment ===
-              testProjectDirSegment.replace(mergedOptions.testProjectSuffix, '') &&
-            sourcePathAfterProjectDir === testPathAfterProjectDir;
-          return isMatching;
-        });
-
-        if (matchingSourceByDir) {
-          // We found a matching source file based on directory - check if the test file is in the expected location
-          const expectedTestPath = this.calculateExpectedTestPath(
-            matchingSourceByDir,
-            mergedOptions,
-          );
-
-          // Use case-sensitive comparison to detect case-only differences (important on Windows)
-          if (testFile !== expectedTestPath) {
-            // Extract directory and filename components
-            const actualDir = path.dirname(testFile);
-            const expectedDir = path.dirname(expectedTestPath);
-            const expectedFileName = path.basename(expectedTestPath);
-
-            // Compare directories (case-insensitive for cross-platform compatibility)
-            if (path.normalize(actualDir) === path.normalize(expectedDir)) {
-              // Same directory, different filename (including case-only differences)
-              result.errors.push({
-                type: AnalysisErrorType.InvalidFileName,
-                message: `Test file has incorrect name. Expected: ${expectedFileName}`,
-                sourceFilePath: matchingSourceByDir,
-                actualTestPath: testFile,
-                expectedTestPath: expectedTestPath,
-              });
-            } else {
-              // Different directory
-              result.errors.push({
-                type: AnalysisErrorType.InvalidDirectoryStructure,
-                message: 'Test file is in wrong directory',
-                sourceFilePath: matchingSourceByDir,
-                actualTestPath: testFile,
-                expectedTestPath: expectedTestPath,
-              });
-            }
-          }
-          // No error if the subdirectory matching source file corresponds to the correct test location
-        } else {
-          // No matching subdirectory - report multiple source files
-          result.errors.push({
-            type: AnalysisErrorType.InvalidDirectoryStructure,
-            message: `Multiple matching source files found (${matchingSourceFiles.length}). Unable to determine correct source file`,
-            sourceFilePath: matchingSourceFiles.join(', '),
-            actualTestPath: testFile,
-          });
-        }
-      } else {
-        const sourcePath = matchingSourceFiles[0];
-        const expectedTestPath = this.calculateExpectedTestPath(sourcePath, mergedOptions);
-
-        // Use case-sensitive comparison to detect case-only differences (important on Windows)
-        if (testFile !== expectedTestPath) {
-          // Extract directory and filename components
-          const actualDir = path.dirname(testFile);
-          const expectedDir = path.dirname(expectedTestPath);
-          const expectedFileName = path.basename(expectedTestPath);
-
-          // Compare directories (case-insensitive for cross-platform compatibility)
-          if (path.normalize(actualDir) === path.normalize(expectedDir)) {
-            // Same directory, different filename (including case-only differences)
-            result.errors.push({
-              type: AnalysisErrorType.InvalidFileName,
-              message: `Test file has incorrect name. Expected: ${expectedFileName}`,
-              sourceFilePath: sourcePath,
-              actualTestPath: testFile,
-              expectedTestPath: expectedTestPath,
-            });
-          } else {
-            // Different directory
-            result.errors.push({
-              type: AnalysisErrorType.InvalidDirectoryStructure,
-              message: 'Test file is in wrong directory',
-              sourceFilePath: sourcePath,
-              actualTestPath: testFile,
-              expectedTestPath: expectedTestPath,
-            });
-          }
-        }
-      }
-
-      if (result.errors.length > 0) {
+      const result = await this.analyzeTestFile(testFile, mergedOptions, sourceFiles);
+      if (result) {
         results.push(result);
       }
     }
@@ -185,8 +61,16 @@ export class Analyzer {
     }
 
     // Final step: Always filter out any results for ignored files or files in ignored directories
-    const filteredResults = results.filter((result) => {
-      const normalizedPath = path.normalize(result.testFilePath);
+    const filteredResults = results.filter((result) => this.filterResults(result, mergedOptions));
+
+    return {
+      results: filteredResults,
+      totalFiles: testFiles.length + sourceFiles.length,
+    };
+  }
+
+  filterResults(result: AnalysisResult, mergedOptions: AnalyzerOptions): boolean {
+    const normalizedPath = path.normalize(result.testFilePath);
 
       // Skip results for files in ignored directories
       for (const ignoreDir of mergedOptions.ignoreDirectories) {
@@ -212,12 +96,141 @@ export class Analyzer {
       }
 
       return true;
-    });
+  }
 
-    return {
-      results: filteredResults,
-      totalFiles: testFiles.length + sourceFiles.length,
+  async analyzeTestFile(
+    testFile: string,
+    mergedOptions: AnalyzerOptions,
+    sourceFiles: string[]
+  ): Promise<AnalysisResult | null> {
+    const testFileName = path.basename(testFile, mergedOptions.fileExtension);
+    const sourceFileName = testFileName.replace(
+      new RegExp(`${mergedOptions.testFileSuffix}$`),
+      ''
+    );
+    const matchingSourceFiles = await this.findMatchingSourceFiles(
+      sourceFiles,
+      sourceFileName,
+      mergedOptions.fileExtension,
+    );
+
+    const result: AnalysisResult = {
+      testFile: path.basename(testFile),
+      testFilePath: path.resolve(testFile),
+      errors: [],
     };
+
+    if (matchingSourceFiles.length === 0) {
+      result.errors.push({
+        type: AnalysisErrorType.InvalidDirectoryStructure,
+        message: `Source file not found: ${sourceFileName}${mergedOptions.fileExtension}`,
+        actualTestPath: testFile,
+      });
+    } else if (matchingSourceFiles.length > 1) {
+      this.handleMultipleMatchingFiles(testFile, matchingSourceFiles, mergedOptions, result);
+    } else {
+      this.handleSingleMatchingFile(testFile, matchingSourceFiles[0], mergedOptions, result);
+    }
+
+    if (result.errors.length > 0) {
+      return result;
+    }
+    return null;
+  }
+
+  private handleMultipleMatchingFiles(
+    testFile: string,
+    matchingSourceFiles: string[],
+    mergedOptions: AnalyzerOptions,
+    result: AnalysisResult
+  ): void {
+    const relativeTestPath = path.relative(mergedOptions.testRoot, testFile);
+    const testDirPath = path.dirname(relativeTestPath);
+    const testDirSegments = testDirPath.split(/[/\\]/);
+    const testProjectDirSegment = testDirSegments[0];
+    const testPathAfterProjectDir = testDirSegments.slice(1).join(path.sep);
+
+    const matchingSourceByDir = this.findMatchingSourceByDirectory(
+      matchingSourceFiles,
+      testProjectDirSegment,
+      testPathAfterProjectDir,
+      mergedOptions
+    );
+
+    if (matchingSourceByDir) {
+      const expectedTestPath = this.calculateExpectedTestPath(matchingSourceByDir, mergedOptions);
+      this.validateTestFilePath(testFile, expectedTestPath, matchingSourceByDir, result);
+    } else {
+      result.errors.push({
+        type: AnalysisErrorType.InvalidDirectoryStructure,
+        message: `Multiple matching source files found (${matchingSourceFiles.length}). Unable to determine correct source file`,
+        sourceFilePath: matchingSourceFiles.join(', '),
+        actualTestPath: testFile,
+      });
+    }
+  }
+
+  private findMatchingSourceByDirectory(
+    matchingSourceFiles: string[],
+    testProjectDirSegment: string,
+    testPathAfterProjectDir: string,
+    mergedOptions: AnalyzerOptions
+  ): string | undefined {
+    return matchingSourceFiles.find((file) => {
+      const relativeSourcePath = path.relative(mergedOptions.srcRoot, file);
+      const sourceDirPath = path.dirname(relativeSourcePath);
+      const sourceDirSegments = sourceDirPath.split(/[/\\]/);
+      const sourceProjectDirSegment = sourceDirSegments[0];
+      const sourcePathAfterProjectDir = sourceDirSegments.slice(1).join(path.sep);
+
+      return (
+        sourceProjectDirSegment === testProjectDirSegment.replace(mergedOptions.testProjectSuffix, '') &&
+        sourcePathAfterProjectDir === testPathAfterProjectDir
+      );
+    });
+  }
+
+  private handleSingleMatchingFile(
+    testFile: string,
+    sourcePath: string,
+    mergedOptions: AnalyzerOptions,
+    result: AnalysisResult
+  ): void {
+    const expectedTestPath = this.calculateExpectedTestPath(sourcePath, mergedOptions);
+    this.validateTestFilePath(testFile, expectedTestPath, sourcePath, result);
+  }
+
+  private validateTestFilePath(
+    testFile: string,
+    expectedTestPath: string,
+    sourcePath: string,
+    result: AnalysisResult
+  ): void {
+    if (testFile === expectedTestPath) {
+      return;
+    }
+
+    const actualDir = path.dirname(testFile);
+    const expectedDir = path.dirname(expectedTestPath);
+    const expectedFileName = path.basename(expectedTestPath);
+
+    if (path.normalize(actualDir) === path.normalize(expectedDir)) {
+      result.errors.push({
+        type: AnalysisErrorType.InvalidFileName,
+        message: `Test file has incorrect name. Expected: ${expectedFileName}`,
+        sourceFilePath: sourcePath,
+        actualTestPath: testFile,
+        expectedTestPath: expectedTestPath,
+      });
+    } else {
+      result.errors.push({
+        type: AnalysisErrorType.InvalidDirectoryStructure,
+        message: 'Test file is in wrong directory',
+        sourceFilePath: sourcePath,
+        actualTestPath: testFile,
+        expectedTestPath: expectedTestPath,
+      });
+    }
   }
 
   async findTestFiles(
