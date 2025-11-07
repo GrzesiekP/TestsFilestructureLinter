@@ -19,13 +19,16 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install deps
-        run: npm ci
+        run: npm install
 
       - name: Build
         run: npm run build
+
+      - name: Test
+        run: npm test
 
   publish-npm:
     needs: build
@@ -43,7 +46,7 @@ jobs:
           registry-url: https://registry.npmjs.org/
 
       - name: Install deps
-        run: npm ci
+        run: npm install
 
       - name: Configure git author
         run: |
@@ -51,7 +54,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version (patch) without CI loop
-        run: npm version patch -m "chore(release): %s [skip ci]"
+        run: npm version patch -m "chore(release) %s [skip ci]"
 
       - name: Build
         run: npm run build
