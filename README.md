@@ -35,6 +35,11 @@ Filtering:
   --ignore-directories <list>     Comma-separated list of directories to ignore
   --ignore-files <list>           Comma-separated list of files to ignore
 
+Output:
+  -o, --output [path]            Output JSON report to file
+                                 If path is omitted, defaults to:
+                                 test-filestructure-linter-results/result-<datetime>.json
+
 Other options:
   -e, --ext <ext>                File extension to analyze (default: ".cs")
   --test-suffix <suffix>          Test file suffix (default: "Tests")
@@ -75,6 +80,12 @@ test-filestructure-linter -s ./src -t ./tests -d --ignore-directories bin,obj,In
 # Using relative or absolute paths
 test-filestructure-linter -s ../../MyProject/src -t ../../MyProject/tests
 test-filestructure-linter -s C:/Projects/MyApp/src -t C:/Projects/MyApp/tests
+
+# Output JSON report to default location
+test-filestructure-linter -s ./src -t ./tests -d -o
+
+# Output JSON report to custom location
+test-filestructure-linter -s ./src -t ./tests -d -o ./reports/my-report.json
 ```
 
 ## Validation Types
@@ -120,6 +131,37 @@ When enabled with `-m` or `--missing`, checks for:
   - ✨ Expected test file paths
 - Allows selecting multiple files using checkboxes
 - Shows fix operation results
+
+## JSON Output Report
+
+The tool can generate a detailed JSON report of the analysis results using the `-o` or `--output` option.
+
+### Usage
+
+```bash
+# Generate report with default path
+test-filestructure-linter -s ./src -t ./tests -d -o
+
+# Generate report with custom path
+test-filestructure-linter -s ./src -t ./tests -d -o ./my-reports/analysis.json
+```
+
+### Default Output Path
+
+When `-o` is used without specifying a path, the report is saved to:
+```
+test-filestructure-linter-results/result-<datetime>.json
+```
+
+The `<datetime>` format is: `YYYYMMDD-HHMMSS` (e.g., `20231107-143025`)
+
+### Report Format
+
+The JSON report contains:
+- Summary statistics (total files analyzed, files with errors, etc.)
+- Detailed error information for each test file
+- Expected vs. actual file paths
+- Severity levels for each issue
 
 ## Filtering Options
 

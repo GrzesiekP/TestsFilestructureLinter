@@ -59,7 +59,7 @@ program
       .map((s) => s.trim())
       .filter(Boolean);
   })
-  .option('-o, --output <path>', 'Output JSON report to file')
+  .option('-o, --output <path>', 'Output JSON report to file (default: test-filestructure-linter-results/result-<datetime>.json)')
   .option('-a, --all', 'Fix all directory structure issues by moving files')
   .option('-f, --fix <path>', 'Fix a specific test file')
   .option('-i, --interactive', 'Interactive mode - select files to fix')
@@ -95,7 +95,7 @@ program
       reporter.reportResults(results, totalFiles, options.interactive);
 
       // Generate JSON report if output option is provided
-      if (options.output) {
+      if (options.output !== undefined) {
         try {
           const jsonReport = generateJsonReport(results, totalFiles);
           let outputPath: string;
@@ -114,7 +114,7 @@ program
               String(now.getHours()).padStart(2, '0') +
               String(now.getMinutes()).padStart(2, '0') +
               String(now.getSeconds()).padStart(2, '0');
-            outputPath = path.resolve(`test-filestructure-linter-output/results-${datetime}.json`);
+            outputPath = path.resolve(`test-filestructure-linter-results/result-${datetime}.json`);
           }
 
           // Create parent directories if they don't exist
