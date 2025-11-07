@@ -39,7 +39,7 @@
     "@types/cli-progress": "^3.11.5",
     "@types/figlet": "^1.5.8",
     "@types/glob": "^8.1.0",
-    "@types/jest": "^29.5.12",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.11.17",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
